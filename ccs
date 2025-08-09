@@ -1,0 +1,362 @@
+#!/bin/bash
+
+APP_NAME="cc_switcher"
+CONFIG_FILE_NAME="config.json"
+
+get_config_home() {
+    if [[ -n "$XDG_CONFIG_HOME" ]]; then
+        echo "$XDG_CONFIG_HOME/$APP_NAME"
+    else
+        echo "$HOME/.config/$APP_NAME"
+    fi
+}
+
+get_config_path() {
+    echo "$(get_config_home)/$CONFIG_FILE_NAME"
+}
+
+load_config() {
+    local config_path="$(get_config_path)"
+    if [[ ! -f "$config_path" ]]; then
+        echo '{"current": null, "profiles": {}}'
+        return
+    fi
+    cat "$config_path" 2>/dev/null || echo '{"current": null, "profiles": {}}'
+}
+
+save_config() {
+    local config_data="$1"
+    local config_home="$(get_config_home)"
+    local config_path="$(get_config_path)"
+    
+    mkdir -p "$config_home"
+    echo "$config_data" > "$config_path.tmp"
+    mv "$config_path.tmp" "$config_path"
+}
+
+get_profile() {
+    local name="$1"
+    local config="$(load_config)"
+    echo "$config" | jq -r ".profiles[\"$name\"] // empty"
+}
+
+get_current_profile() {
+    local config="$(load_config)"
+    echo "$config" | jq -r ".current // empty"
+}
+
+list_profiles() {
+    local config="$(load_config)"
+    echo "$config" | jq -r ".profiles | keys[]" 2>/dev/null
+}
+
+profile_exists() {
+    local name="$1"
+    local profile="$(get_profile "$name")"
+    [[ -n "$profile" && "$profile" != "null" ]]
+}
+
+set_current_profile() {
+    local name="$1"
+    local config="$(load_config)"
+    local new_config="$(echo "$config" | jq --arg name "$name" '.current = $name')"
+    save_config "$new_config"
+}
+
+add_profile() {
+    local name="$1"
+    local base_url="$2"
+    local token="$3"
+    local config="$(load_config)"
+    local new_config="$(echo "$config" | jq \
+        --arg name "$name" \
+        --arg base_url "$base_url" \
+        --arg token "$token" \
+        '.profiles[$name] = {base_url: $base_url, auth_token: $token}')"
+    save_config "$new_config"
+}
+
+delete_profile() {
+    local name="$1"
+    local config="$(load_config)"
+    local new_config="$(echo "$config" | jq --arg name "$name" 'del(.profiles[$name]) | if .current == $name then .current = null else . end')"
+    save_config "$new_config"
+}
+
+escape_sh_single_quotes() {
+    printf "%s" "$1" | sed "s/'/'\\''/g"
+}
+
+emit_env() {
+    local name="$1"
+    local profile="$(get_profile "$name")"
+    if [[ -z "$profile" || "$profile" == "null" ]]; then
+        return 1
+    fi
+    
+    local base_url="$(echo "$profile" | jq -r ".base_url")"
+    local token="$(echo "$profile" | jq -r ".auth_token")"
+    local esc_base_url="$(escape_sh_single_quotes "$base_url")"
+    local esc_token="$(escape_sh_single_quotes "$token")"
+    echo "export ANTHROPIC_BASE_URL='$esc_base_url'"
+    echo "export ANTHROPIC_AUTH_TOKEN='$esc_token'"
+}
+
+apply_env() {
+    local name="$1"
+    if [[ -n "$CCS_SHELL_INTEGRATION" ]]; then
+        local env_commands="$(emit_env "$name")"
+        if [[ $? -eq 0 ]]; then
+            eval "$env_commands"
+            return 0
+        fi
+        return 1
+    else
+        echo "Note: Environment variables set in subprocess. Use 'eval \"\$(ccs env $name)\"' to apply to current shell." >&2
+        return 0
+    fi
+}
+
+cmd_add() {
+    local name="$1"
+    local base_url="$2"
+    local token="$3"
+    local set_current="$4"
+    
+    if [[ -z "$name" ]]; then
+        read -p "Profile name: " name
+        [[ -z "$name" ]] && { echo "name is required" >&2; return 2; }
+    fi
+    
+    if profile_exists "$name"; then
+        read -p "Profile '$name' already exists. Overwrite? [y/N]: " confirm
+        [[ ! "$confirm" =~ ^[yY]$ ]] && { echo "Cancelled"; return 0; }
+    fi
+    
+    if [[ -z "$base_url" ]]; then
+        echo "Enter base URL (press Enter for default: https://api.anthropic.com):"
+        read -p "Base URL: " base_url
+        [[ -z "$base_url" ]] && base_url="https://api.anthropic.com"
+    fi
+    
+    if [[ -z "$token" ]]; then
+        read -s -p "Auth token: " token
+        echo
+        [[ -z "$token" ]] && { echo "token is required" >&2; return 2; }
+    fi
+    
+    add_profile "$name" "$base_url" "$token"
+    
+    local current="$(get_current_profile)"
+    if [[ "$set_current" == "true" || -z "$current" ]]; then
+        set_current_profile "$name"
+        echo "Added profile '$name' and set as current" >&2
+        if apply_env "$name"; then
+            echo "Environment updated for '$name'" >&2
+        fi
+    else
+        read -p "Set '$name' as current profile? [Y/n]: " confirm
+        if [[ ! "$confirm" =~ ^[nN]$ ]]; then
+            set_current_profile "$name"
+            echo "Added profile '$name' and set as current" >&2
+            if apply_env "$name"; then
+                echo "Environment updated for '$name'" >&2
+            fi
+        else
+            echo "Added profile '$name'" >&2
+        fi
+    fi
+}
+
+cmd_delete() {
+    local name="$1"
+    [[ -z "$name" ]] && { echo "usage: ccs delete <name>" >&2; return 2; }
+    
+    if ! profile_exists "$name"; then
+        echo "profile '$name' not found" >&2
+        return 2
+    fi
+    
+    delete_profile "$name"
+    echo "deleted profile '$name'" >&2
+}
+
+cmd_list() {
+    local current="$(get_current_profile)"
+    local profiles="$(list_profiles)"
+    
+    if [[ -z "$profiles" ]]; then
+        echo "no profiles"
+        return 0
+    fi
+    
+    while IFS= read -r name; do
+        if [[ "$name" == "$current" ]]; then
+            echo "* $name"
+        else
+            echo "  $name"
+        fi
+    done <<< "$profiles" | sort
+}
+
+cmd_select() {
+    local name="$1"
+    [[ -z "$name" ]] && { echo "usage: ccs select <name>" >&2; return 2; }
+    
+    if ! profile_exists "$name"; then
+        echo "profile '$name' not found" >&2
+        return 2
+    fi
+    
+    set_current_profile "$name"
+    echo "selected '$name'" >&2
+    
+    if apply_env "$name"; then
+        echo "Environment updated for '$name'" >&2
+    else
+        echo "Failed to update environment" >&2
+        return 1
+    fi
+}
+
+cmd_use() {
+    local name="$1"
+    [[ -z "$name" ]] && { echo "usage: ccs use <name>" >&2; return 2; }
+    
+    if ! profile_exists "$name"; then
+        echo "profile '$name' not found" >&2
+        return 2
+    fi
+    
+    set_current_profile "$name"
+    echo "switched to '$name'" >&2
+    
+    if apply_env "$name"; then
+        echo "Environment updated for '$name'" >&2
+    else
+        echo "Failed to update environment" >&2
+        return 1
+    fi
+}
+
+cmd_current() {
+    local current="$(get_current_profile)"
+    if [[ -z "$current" ]]; then
+        echo "none"
+    else
+        echo "$current"
+    fi
+}
+
+cmd_env() {
+    local name="$1"
+    [[ -z "$name" ]] && name="$(get_current_profile)"
+    
+    if [[ -z "$name" ]]; then
+        echo "no profile selected" >&2
+        return 2
+    fi
+    
+    if ! emit_env "$name"; then
+        echo "profile '$name' not found" >&2
+        return 2
+    fi
+}
+
+cmd_apply() {
+    cmd_env "$@"
+}
+
+cmd_help() {
+    cat << 'EOF'
+cc_switcher - Claude Code Account Switcher
+
+USAGE:
+    ccs <command> [options]
+
+COMMANDS:
+    add [name] [--base-url <url>] [--token <token>] [--set-current]
+        Add a new profile (interactive mode if options not provided)
+        
+    delete <name>
+        Delete a profile
+        
+    list
+        List all profiles (current marked with *)
+        
+    select <name>
+        Select current profile and update environment automatically
+        
+    use <name>
+        Switch to profile and update environment automatically
+        
+    current
+        Show current profile name
+        
+    env [name]
+        Print export statements for profile (defaults to current)
+        
+    apply [name]
+        Print export statements for profile (for eval; no rc change)
+        
+    help
+        Show this help message
+
+EXAMPLES:
+    ccs add                   # Interactive mode
+    ccs add work --base-url https://api.anthropic.com --token sk-xxx
+    ccs list
+    ccs select work           # Automatically updates environment
+    ccs use work              # Same as above
+    eval "$(ccs apply)"       # Manual environment update
+
+SETUP:
+    Run './setup.sh [auto|bash|zsh|both]' to install shell integration
+    This adds a lightweight 'ccs' function to your shell rc.
+    Do NOT 'source' the script directly in rc.
+
+NOTES:
+    - After setup, 'ccs select' and 'ccs use' automatically update environment
+    - Direct script usage: use 'eval "$(./ccs env profile)"' for manual control
+    - Shell integration enables seamless profile switching
+EOF
+}
+
+main() {
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "Error: jq is required but not installed" >&2
+        echo "Please install jq: sudo apt install jq" >&2
+        return 1
+    fi
+    
+    local cmd="$1"
+    shift
+    
+    case "$cmd" in
+        add)
+            local name="" base_url="" token="" set_current="false"
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --base-url) base_url="$2"; shift 2 ;;
+                    --token) token="$2"; shift 2 ;;
+                    --set-current) set_current="true"; shift ;;
+                    *) name="$1"; shift ;;
+                esac
+            done
+            cmd_add "$name" "$base_url" "$token" "$set_current"
+            ;;
+        delete|del) cmd_delete "$1" ;;
+        list|ls) cmd_list ;;
+        select) cmd_select "$1" ;;
+        use) cmd_use "$1" ;;
+        current|cur) cmd_current ;;
+        env) cmd_env "$1" ;;
+        apply) cmd_apply "$1" ;;
+        help|--help|-h|"") cmd_help ;;
+        *) echo "Unknown command: $cmd" >&2; cmd_help >&2; return 1 ;;
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
