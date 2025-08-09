@@ -1,134 +1,152 @@
 # cc_switcher
 
-一个用于切换 Claude Code 账户的 CLI 工具，支持快速在不同 API 端点和认证令牌间切换。
+[中文](README_zh.md) | English
 
-## 特性
+A CLI tool for switching Claude Code accounts, supporting quick switching between different API endpoints and authentication tokens.
 
-- **零依赖**：纯 shell 实现，仅需 `jq`
-- **跨 shell**：兼容 bash 和 zsh
-- **即时生效**：`ccs select/use` 直接更新当前 shell 环境变量
-- **安全存储**：配置存储在 `~/.config/cc_switcher/config.json`
-- **安全写入**：防注入的 JSON 写入和导出值转义
-- **干净安装**：不在 source rc 时产生输出
+## Implementation
 
-## 快速开始
+**Pure Shell Script Implementation** - This tool is implemented entirely in shell script (bash/zsh), not Python, Node.js, or other runtime languages.
 
-### 1. 安装 shell 集成
+### Why Shell Script?
+
+- **🚀 Lightning Fast**: No interpreter startup time - executes instantly
+- **📦 Zero Runtime Dependencies**: Works on any Unix-like system with bash/zsh
+- **🔧 Native Environment Integration**: Direct shell environment variable manipulation
+- **💾 Minimal Resource Usage**: Extremely low memory footprint and CPU usage
+- **🎯 Perfect for the Job**: Environment variable management is shell's native domain
+- **📱 Universal Compatibility**: Available on virtually every development environment
+- **🔄 Instant Effect**: Changes apply immediately to current shell session
+- **🛠️ Easy to Customize**: Simple, readable code that's easy to modify
+- **📋 No Package Management**: No need for pip, npm, cargo, or other package managers
+
+## Features
+
+- **Zero Dependencies**: Pure shell implementation, only requires `jq`
+- **Cross-Shell**: Compatible with bash and zsh
+- **Instant Effect**: `ccs select/use` directly updates current shell environment variables
+- **Secure Storage**: Configuration stored in `~/.config/cc_switcher/config.json`
+- **Safe Writing**: Injection-proof JSON writing and export value escaping
+- **Clean Installation**: No output when sourcing rc files
+
+## Quick Start
+
+### 1. Install Shell Integration
 
 ```bash
-# 自动检测当前 shell (zsh/bash)
+# Auto-detect current shell (zsh/bash)
 ./setup.sh
 
-# 或手动指定
+# Or specify manually
 ./setup.sh zsh
 ./setup.sh bash
 ./setup.sh both
 
-# 可选：检测 jq 是否安装
+# Optional: Check if jq is installed
 ./setup.sh --check-jq
 
-# 重新加载配置
-source ~/.zshrc  # 或 ~/.bashrc
+# Reload configuration
+source ~/.zshrc  # or ~/.bashrc
 ```
 
-### 2. 添加配置
+### 2. Add Configuration
 
 ```bash
-# 交互模式
+# Interactive mode
 ccs add
 
-# 命令行模式
+# Command line mode
 ccs add work --base-url https://api.anthropic.com --token sk-xxx
 ccs add poky --base-url https://api.packycode.com --token sk-yyy
 ```
 
-### 3. 使用
+### 3. Usage
 
 ```bash
-# 查看所有配置
+# View all configurations
 ccs list
 
-# 切换配置（自动更新环境变量）
+# Switch configuration (automatically update environment variables)
 ccs select work
 ccs use poky
 
-# 查看当前配置
+# View current configuration
 ccs current
 
-# 删除配置
+# Delete configuration
 ccs delete old_config
 ```
 
-## 命令参考
+## Command Reference
 
-| 命令 | 说明 | 示例 |
-|------|------|------|
-| `add [name] [options]` | 添加新配置 | `ccs add work --base-url https://api.anthropic.com --token sk-xxx` |
-| `list` | 列出所有配置 | `ccs list` |
-| `select <name>` | 选择配置并更新环境 | `ccs select work` |
-| `use <name>` | 同 select | `ccs use work` |
-| `current` | 显示当前配置名称 | `ccs current` |
-| `delete <name>` | 删除配置 | `ccs delete work` |
-| `env [name]` | 输出 export 语句 | `eval "$(ccs env work)"` |
-| `apply [name]` | 同 env | `eval "$(ccs apply)"` |
-| `help` | 显示帮助 | `ccs help` |
+| Command | Description | Example |
+|---------|-------------|---------|
+| `add [name] [options]` | Add new configuration | `ccs add work --base-url https://api.anthropic.com --token sk-xxx` |
+| `list` | List all configurations | `ccs list` |
+| `select <name>` | Select configuration and update current shell environment | `ccs select work` |
+| `use <name>` | Same as select, switch to specified configuration | `ccs use work` |
+| `current` | Show current configuration name | `ccs current` |
+| `delete <name>` | Delete configuration | `ccs delete work` |
+| `env [name]` | Output export statements (without updating environment) | `eval "$(ccs env work)"` |
+| `apply [name]` | Same as env, output export statements | `eval "$(ccs apply)"` |
+| `help` | Show help | `ccs help` |
 
-### 选项
+### Options
 
-- `--base-url <url>` - API 基础 URL
-- `--token <token>` - 认证令牌
-- `--set-current` - 添加后立即设为当前配置
+- `--base-url <url>` - API base URL
+- `--token <token>` - Authentication token
+- `--set-current` - Set as current configuration after adding
 
-## 安装与卸载
+## Installation & Uninstallation
 
-### 安装
+### Installation
 
 ```bash
-# 基本安装
+# Basic installation
 ./setup.sh
 
-# 指定 shell
+# Specify shell
 ./setup.sh zsh
 ./setup.sh bash
 ./setup.sh both
 
-# 检测依赖
+# Check dependencies
 ./setup.sh --check-jq
 ```
 
-### 卸载
+### Uninstallation
 
 ```bash
-# 卸载 shell 集成
+# Uninstall shell integration
 ./setup.sh uninstall zsh
 ./setup.sh uninstall bash
 ./setup.sh uninstall both
 
-# 然后重新加载 rc
-source ~/.zshrc  # 或 ~/.bashrc
+# Then reload rc
+source ~/.zshrc  # or ~/.bashrc
 ```
 
-## 工作原理
+## How It Works
 
-1. **配置存储**：JSON 格式存储在 `~/.config/cc_switcher/config.json`
-2. **环境变量**：设置 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`
-3. **Shell 集成**：`setup.sh` 在 rc 文件中写入轻量 `ccs()` 函数
-4. **即时生效**：函数通过 `eval "$(ccs env ...)"` 在当前 shell 中应用环境变量
+1. **Configuration Storage**: JSON format stored in `~/.config/cc_switcher/config.json`
+2. **Environment Variables**: Sets `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`
+3. **Shell Integration**: `setup.sh` writes lightweight `ccs()` function in rc files
+4. **Instant Effect**: Function applies environment variables in current shell via `eval "$(ccs env ...)"`
 
-## 安全特性
+## Security Features
 
-- **JSON 安全写入**：使用 `jq --arg` 防止注入攻击
-- **值转义**：导出的环境变量值经过单引号转义
-- **权限控制**：配置文件仅当前用户可读写
-- **错误隔离**：stdout/stderr 分离，便于脚本组合
+- **Safe JSON Writing**: Uses `jq --arg` to prevent injection attacks
+- **Value Escaping**: Exported environment variable values are single-quote escaped
+- **Permission Control**: Configuration files are readable/writable by current user only
+- **Error Isolation**: stdout/stderr separation for easy script composition
 
-## 兼容性
+## Compatibility
 
-- **Shell**：bash 4.0+, zsh 5.0+
-- **系统**：Linux, macOS, WSL
-- **依赖**：jq (JSON 处理)
+- **Shell**: bash 4.0+, zsh 5.0+
+- **System**: Linux, macOS, WSL
+- **Dependencies**: jq (JSON processing)
 
-安装 jq：
+Install jq:
 ```bash
 # Debian/Ubuntu
 sudo apt install -y jq
@@ -143,32 +161,32 @@ sudo pacman -S jq
 brew install jq
 ```
 
-## 故障排除
+## Troubleshooting
 
-### ccs 命令未找到
+### ccs command not found
 ```bash
-# 确认已运行安装
+# Confirm installation has been run
 ./setup.sh
 
-# 重新加载 shell 配置
-source ~/.zshrc  # 或 ~/.bashrc
+# Reload shell configuration
+source ~/.zshrc  # or ~/.bashrc
 
-# 或重启终端
+# Or restart terminal
 ```
 
-### jq 未安装
+### jq not installed
 ```bash
-# 检测 jq
+# Check jq
 ./setup.sh --check-jq
 
-# 按提示安装 jq
+# Install jq as prompted
 ```
 
-### 环境变量未生效
-- 确保使用 `ccs select` 或 `ccs use` 而非直接执行脚本
-- 在新终端中测试，确认 shell 集成已加载
+### Environment variables not taking effect
+- Ensure using `ccs select` or `ccs use` instead of directly executing script
+- Test in new terminal to confirm shell integration is loaded
 
-## 配置文件格式
+## Configuration File Format
 
 ```json
 {
@@ -179,13 +197,13 @@ source ~/.zshrc  # 或 ~/.bashrc
       "auth_token": "sk-xxx"
     },
     "poky": {
-      "base_url": "https://api.packycode.com", 
+      "base_url": "https://api.packycode.com",
       "auth_token": "sk-yyy"
     }
   }
 }
 ```
 
-## 许可证
+## License
 
 MIT License
