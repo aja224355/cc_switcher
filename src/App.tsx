@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import ProviderList from '@/components/ProviderList'
 import ProviderForm from '@/components/ProviderForm'
-import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType } from '@/types/provider'
+import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, EnvironmentMode, EnvironmentActiveProviders } from '@/types/provider'
 import {
   getProviders,
   addProvider,
@@ -27,11 +27,19 @@ import {
   exportClaudeSettingsJson,
   exportCodexConfigToml,
   exportShellEnvVars,
+  generateConnectionCommand,
+  generateRemoteDeployScript,
+  generateWslApplyScript,
   importProviders,
+  getCurrentEnvironmentMode,
+  setCurrentEnvironmentMode,
+  getEnvActiveProviders,
+  setEnvActiveProvider,
+  applyProviderToCurrentEnv,
 } from '@/utils/storage'
 
 type View = 'list' | 'form'
-type ExportFormat = 'json' | 'sql' | 'sql-all' | 'claude-settings' | 'codex-toml' | 'shell-env'
+type ExportFormat = 'json' | 'sql' | 'sql-all' | 'claude-settings' | 'codex-toml' | 'shell-env' | 'connection-cmd' | 'deploy-script' | 'wsl-apply'
 
 // 标签页配置
 const TABS: { type: ProviderType; label: string; color: string }[] = [
@@ -50,6 +58,12 @@ function ConfigManager() {
   const [editingProvider, setEditingProvider] = useState<ClaudeProvider | CodexProvider | GeminiProvider | null>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // 环境模式相关状态
+  const [currentEnvMode, setCurrentEnvMode] = useState<EnvironmentMode>(getCurrentEnvironmentMode())
+  const [envActiveProviders, setEnvActiveProviders] = useState<EnvironmentActiveProviders>(
+    getEnvActiveProviders(activeTab)
+  )
 
   useEffect(() => {
     loadProviders()
@@ -57,6 +71,7 @@ function ConfigManager() {
 
   useEffect(() => {
     setActiveId(getActiveProviderIdByType(activeTab))
+    setEnvActiveProviders(getEnvActiveProviders(activeTab))
   }, [activeTab])
 
   const loadProviders = () => {
@@ -136,6 +151,45 @@ function ConfigManager() {
     setActiveId(id)
   }
 
+  // 环境模式变更
+  const handleEnvModeChange = (mode: EnvironmentMode) => {
+    setCurrentEnvironmentMode(mode)
+    setCurrentEnvMode(mode)
+  }
+
+  // 为特定环境模式设置激活的供应商
+  const handleEnvActivate = (providerId: string, envMode: EnvironmentMode) => {
+    setEnvActiveProvider(activeTab, envMode, providerId)
+    setEnvActiveProviders(getEnvActiveProviders(activeTab))
+    
+    // 如果是当前环境模式，也更新旧的激活状态
+    if (envMode === currentEnvMode) {
+      setActiveId(providerId)
+    }
+  }
+
+  // 一键应用配置
+  const handleApplyConfig = (providerId: string) => {
+    const result = applyProviderToCurrentEnv(activeTab, providerId)
+    
+    if (result.success && result.script) {
+      // 创建下载
+      const blob = new Blob([result.script], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `apply-${activeTab}-${currentEnvMode}.sh`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      alert(`${result.message}\n\n脚本已下载，请在终端中运行。`)
+    } else {
+      alert(result.message)
+    }
+  }
+
   const handleExport = (format: ExportFormat) => {
     setShowExportMenu(false)
     
@@ -190,6 +244,40 @@ function ConfigManager() {
         mimeType = 'text/plain'
         extension = 'sh'
         filename = `${activeTab}-env`
+        break
+      case 'connection-cmd':
+        if (!activeProvider) {
+          alert('请先选择一个供应商')
+          return
+        }
+        data = generateConnectionCommand(activeProvider)
+        mimeType = 'text/plain'
+        extension = 'sh'
+        filename = `${activeTab}-connect-${activeProvider.environmentMode}`
+        break
+      case 'deploy-script':
+        if (!activeProvider) {
+          alert('请先选择一个供应商')
+          return
+        }
+        if (activeProvider.environmentMode !== 'remote') {
+          alert('部署脚本仅适用于 Remote 环境模式\n请先将环境模式切换为 "Remote" 并配置 SSH 服务器')
+          return
+        }
+        data = generateRemoteDeployScript(activeProvider)
+        mimeType = 'text/plain'
+        extension = 'sh'
+        filename = `deploy-${activeTab}-to-remote`
+        break
+      case 'wsl-apply':
+        if (!activeProvider) {
+          alert('请先选择一个供应商')
+          return
+        }
+        data = generateWslApplyScript(activeProvider)
+        mimeType = 'text/plain'
+        extension = 'sh'
+        filename = `apply-${activeTab}-to-wsl`
         break
       default:
         data = exportProvidersJSON()
@@ -256,6 +344,12 @@ function ConfigManager() {
           showExportMenu={showExportMenu}
           onExportFormat={handleExport}
           onCloseExportMenu={() => setShowExportMenu(false)}
+          // 环境模式相关
+          currentEnvMode={currentEnvMode}
+          envActiveProviders={envActiveProviders}
+          onEnvModeChange={handleEnvModeChange}
+          onEnvActivate={handleEnvActivate}
+          onApplyConfig={handleApplyConfig}
         />
       ) : (
         <ProviderForm

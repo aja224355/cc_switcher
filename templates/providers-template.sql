@@ -140,7 +140,7 @@ INSERT INTO providers (id, type, name, apiKey, apiUrl, models, isActive, created
 --
 -- Codex 配置说明 (官方值):
 --   approvalPolicy: on-request (请求时) | never (从不) | untrusted (不信任) | on-failure (失败时)
---   sandboxMode: off (关闭) | workspace-write (工作区写入) | read-only (只读) | none (无)
+--   sandboxMode: off (关闭) | workspace-write (工作区写入) | read-only (只读) | danger-full-access (完全访问)
 --
 -- 使用提示:
 -- 1. 将 YOUR_API_KEY_HERE 替换为你的实际 API 密钥

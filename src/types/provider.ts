@@ -4,6 +4,13 @@ export type ProviderType = 'claude' | 'codex' | 'gemini'
 // 环境模式
 export type EnvironmentMode = 'local' | 'wsl' | 'remote'
 
+// 按环境模式存储的激活供应商配置
+export interface EnvironmentActiveProviders {
+  local: string | null    // 本地环境激活的供应商 ID
+  wsl: string | null      // WSL 环境激活的供应商 ID  
+  remote: string | null   // 远程环境激活的供应商 ID
+}
+
 // 认证模式
 export type AuthMode = 'plan' | 'apikey'
 
@@ -67,8 +74,8 @@ export interface ClaudeProvider extends BaseProvider {
 // Codex 审批策略 (官方值: on-request, never, untrusted, on-failure)
 export type CodexApprovalPolicy = 'on-request' | 'never' | 'untrusted' | 'on-failure'
 
-// Codex 沙箱模式 (官方值: off, workspace-write, read-only, none)
-export type CodexSandboxMode = 'off' | 'workspace-write' | 'read-only' | 'none'
+// Codex 沙箱模式 (官方值: off, workspace-write, read-only, danger-full-access)
+export type CodexSandboxMode = 'off' | 'workspace-write' | 'read-only' | 'danger-full-access'
 
 // Codex Profile 配置 (支持 config.toml 中的 profiles)
 export interface CodexProfile {

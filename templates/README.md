@@ -19,6 +19,71 @@ cc_switcher 现在支持多种官方格式导出：
 | Claude settings.json | `~/.claude/settings.json` | Claude Code 官方格式 |
 | Codex config.toml | `~/.codex/config.toml` | Codex CLI 官方格式 |
 | Shell 环境变量 | `.env.sh` | Bash/Zsh 环境变量 |
+| 连接命令 | `.sh` | 本地/WSL/SSH 启动脚本 |
+
+## 环境模式支持
+
+cc_switcher 支持三种运行环境：
+
+| 环境模式 | 说明 | 使用场景 |
+|---------|------|---------|
+| **本地 (Local)** | 在当前电脑本地运行 | Windows/macOS/Linux 本地开发 |
+| **WSL** | 通过 WSL 环境运行 | Windows 用户使用 WSL2 运行 |
+| **SSH Remote** | 通过 SSH 连接远程服务器 | 远程开发/云服务器 |
+
+### WSL 环境配置
+
+Windows 用户可以使用 WSL 运行 Claude Code：
+
+```bash
+# 方式一: 直接进入 WSL
+wsl
+claude
+
+# 方式二: 单行命令
+wsl bash -lc "claude"
+
+# 方式三: 指定工作目录
+wsl bash -lc "cd /mnt/c/Users/you/project && claude"
+```
+
+### SSH Remote 环境配置
+
+通过 SSH 连接远程服务器运行 Claude Code：
+
+```bash
+# 基础连接
+ssh -i ~/.ssh/id_rsa user@server -t "claude"
+
+# 带端口转发（用于 Web UI）
+ssh -i ~/.ssh/id_rsa -L 8080:localhost:8080 user@server -t "claude"
+
+# 使用 tmux 保持会话
+ssh user@server -t "tmux new-session -A -s claude 'claude'"
+```
+
+### 一键部署配置到远程服务器
+
+cc_switcher 提供**远程部署脚本**功能，可以一键将配置同步到远程服务器：
+
+1. 在 Web UI 中配置好供应商
+2. 选择环境模式为 "Remote"
+3. 添加 SSH Remote 配置（服务器地址、用户名、SSH 密钥等）
+4. 点击"导出" → "远程部署脚本"
+5. 在本地运行生成的脚本
+
+```bash
+# 生成的部署脚本示例
+chmod +x deploy-claude-to-remote.sh
+./deploy-claude-to-remote.sh
+```
+
+部署脚本会自动：
+- 测试 SSH 连接
+- 创建远程配置目录 (`~/.claude/` 或 `~/.codex/`)
+- 写入配置文件
+- 设置环境变量
+- 验证配置
 
 ## 使用方法
 
@@ -130,7 +195,7 @@ Codex 支持以下特有配置 (官方值)：
 | 配置项 | 可选值 | 说明 |
 |--------|--------|------|
 | `approval_policy` | `on-request`, `never`, `untrusted`, `on-failure` | 审批策略 |
-| `sandbox_mode` | `off`, `workspace-write`, `read-only`, `none` | 沙箱模式 |
+| `sandbox_mode` | `off`, `workspace-write`, `read-only`, `danger-full-access` | 沙箱模式 |
 | `model_provider` | `openai`, `azure`, `ollama`, 等 | 模型提供商 |
 | `model_reasoning_effort` | `low`, `medium`, `high` | 推理力度 |
 | `model_reasoning_summary` | `auto`, `always`, `never` | 推理摘要 |
