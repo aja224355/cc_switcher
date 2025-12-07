@@ -29,6 +29,7 @@ import {
   exportShellEnvVars,
   generateConnectionCommand,
   generateRemoteDeployScript,
+  generateRemoteDeployScriptForEnv,
   generateWslApplyScript,
   generateWslScript,
   importProviders,
@@ -197,22 +198,32 @@ function ConfigManager() {
       a.href = url
       // 生成更有意义的文件名
       let filename = `apply-${activeTab}`
+      let extension = 'sh'  // 默认 bash 脚本
+      
       if (currentEnvMode === 'local') {
         filename += '-local'
       } else if (currentEnvMode === 'wsl') {
         filename += '-wsl'
+        // 检查当前供应商的 WSL 配置
+        const provider = providers.find(p => p.id === providerId)
+        if (provider?.wslPaths?.applyMode === 'windows') {
+          extension = 'ps1'  // PowerShell 脚本
+        }
       } else if (isRemoteEnvMode(currentEnvMode)) {
         const remoteId = parseRemoteEnvMode(currentEnvMode)
         const remote = remoteEnvironments.find(r => r.id === remoteId)
         filename += `-${remote?.name || 'remote'}`
       }
-      a.download = `${filename}.sh`
+      a.download = `${filename}.${extension}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      alert(`${result.message}\n\n脚本已下载，请在终端中运行。`)
+      const runInstructions = extension === 'ps1' 
+        ? '请在 PowerShell 中运行该脚本（右键 -> 使用 PowerShell 运行）'
+        : '请在终端中运行该脚本'
+      alert(`${result.message}\n\n脚本已下载，${runInstructions}`)
     } else {
       alert(result.message)
     }
@@ -329,11 +340,21 @@ function ConfigManager() {
           alert('请先选择一个供应商')
           return
         }
-        if (activeProvider.environmentMode !== 'remote') {
-          alert('部署脚本仅适用于 Remote 环境模式\n请先将环境模式切换为 "Remote" 并配置 SSH 服务器')
+        // 检查当前是否在远程环境模式
+        if (!isRemoteEnvMode(currentEnvMode)) {
+          alert('部署脚本仅适用于远程环境模式\n请先在环境面板中选择一个远程环境')
           return
         }
-        data = generateRemoteDeployScript(activeProvider)
+        {
+          // 获取当前远程环境配置
+          const remoteId = parseRemoteEnvMode(currentEnvMode)
+          const remote = remoteEnvironments.find(r => r.id === remoteId)
+          if (remote) {
+            data = generateRemoteDeployScriptForEnv(activeProvider, remote)
+          } else {
+            data = generateRemoteDeployScript(activeProvider)
+          }
+        }
         mimeType = 'text/plain'
         extension = 'sh'
         filename = `deploy-${activeTab}-to-remote`
