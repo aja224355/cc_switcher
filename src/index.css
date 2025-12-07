@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --bg-input: #2d2d44;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0b0;
+  --text-muted: #6b6b7b;
+  --accent-orange: #e94560;
+  --accent-yellow: #f39c12;
+  --border-color: #3d3d5c;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Input styles */
+.input-field {
+  @apply w-full px-4 py-3 rounded-lg bg-[#2d2d44] border border-[#3d3d5c] text-white placeholder-gray-500 focus:outline-none focus:border-[#e94560] transition-colors;
+}
+
+.input-label {
+  @apply block text-sm font-medium text-gray-300 mb-2;
+}
+
+/* Button styles */
+.btn-primary {
+  @apply px-6 py-2 bg-[#e94560] text-white rounded-lg hover:bg-[#d63850] transition-colors font-medium;
+}
+
+.btn-secondary {
+  @apply px-6 py-2 bg-[#3d3d5c] text-white rounded-lg hover:bg-[#4d4d6c] transition-colors font-medium;
+}
+
+/* Card styles */
+.card {
+  @apply bg-[#16213e] rounded-xl border border-[#3d3d5c] p-6;
+}
+
+/* Warning box */
+.warning-box {
+  @apply bg-[#3d2a1a] border border-[#f39c12] rounded-lg p-4 text-[#f39c12] flex items-start gap-3;
+}
