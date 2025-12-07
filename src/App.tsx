@@ -402,7 +402,20 @@ function ConfigManager() {
         if (result.success) {
           loadProviders()
           setActiveId(getActiveProviderIdByType(activeTab))
-          alert(`导入成功！共导入 ${result.count} 个配置 (格式: ${result.format?.toUpperCase()})`)
+          
+          // 构建详细的导入结果消息
+          let detailMsg = ''
+          if (result.details) {
+            const parts = []
+            if (result.details.claude > 0) parts.push(`Claude: ${result.details.claude}`)
+            if (result.details.codex > 0) parts.push(`Codex: ${result.details.codex}`)
+            if (result.details.gemini > 0) parts.push(`Gemini: ${result.details.gemini}`)
+            if (parts.length > 0) {
+              detailMsg = `\n\n详细统计:\n${parts.join('\n')}`
+            }
+          }
+          
+          alert(`导入成功！共导入 ${result.count} 个配置 (格式: ${result.format?.toUpperCase()})${detailMsg}`)
         } else {
           alert(`导入失败: ${result.error || '请检查文件格式'}`)
         }

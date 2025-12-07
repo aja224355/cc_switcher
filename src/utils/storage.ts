@@ -734,48 +734,154 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
         }
         
         const id = uuidv4()
-        // 支持 cc-switch v3.8.0+ 的 'app' 字段名以及旧版 'type' 字段
-        const providerType = getValue(['type', 'provider_type', 'app']).toLowerCase() || 'claude'
+        
+        // cc-switch 实际使用 'app_type' 字段 (值为 claude/codex/gemini) 来区分类型
+        // 优先级: app_type > app > type
+        const appTypeField = getValue(['app_type'])  // cc-switch 实际字段名
+        const appField = getValue(['app'])  // 备选
+        const typeField = getValue(['type', 'provider_type'])  // 旧版格式
+        
+        // 确定 provider 类型
+        let providerType: string
+        if (appTypeField && ['claude', 'codex', 'gemini'].includes(appTypeField.toLowerCase())) {
+          // cc-switch 实际格式 - app_type 字段
+          providerType = appTypeField.toLowerCase()
+        } else if (appField && ['claude', 'codex', 'gemini'].includes(appField.toLowerCase())) {
+          // 备选格式
+          providerType = appField.toLowerCase()
+        } else if (typeField) {
+          // 旧版格式
+          providerType = typeField.toLowerCase()
+        } else {
+          // 默认为 claude
+          providerType = 'claude'
+        }
+        
+        // 控制台输出帮助调试
+        console.log(`[SQL Import] 解析到: app_type=${appTypeField}, app=${appField}, type=${typeField}, 最终类型=${providerType}`)
+        
         const name = getValue(['name', 'provider_name', 'title']) || '未命名'
-        // 支持多种 API key 字段名 (包括 cc-switch v3.8.0+ 的 api_key)
+        
+        // cc-switch 使用 settings_config 字段存储 JSON 配置
+        const settingsConfigStr = getValue(['settings_config'])
+        
+        // 支持多种 API key 字段名
         const apiKey = getValue(['apikey', 'api_key', 'key', 'token', 'auth_token'])
         // 支持多种 URL 字段名
         const requestUrl = getValue(['apiurl', 'api_url', 'base_url', 'baseurl', 'request_url', 'url'])
-        // 支持 cc-switch v3.8.0+ 的 config_json 字段
+        // 备选配置字段
         const modelsStr = getValue(['models', 'model', 'model_config', 'config', 'config_json'])
-        const isActiveStr = getValue(['isactive', 'is_active', 'active'])
-        const isActive = isActiveStr === '1' || isActiveStr === 'true' || isActiveStr === 'TRUE'
-        // cc-switch v3.8.0+ 额外字段
-        const memo = getValue(['memo', 'notes', 'description', 'note'])
-        const docUrl = getValue(['doc_url', 'website', 'website_url', 'document_url'])
+        // cc-switch 使用 is_current 表示当前激活状态
+        const isCurrentStr = getValue(['is_current', 'isactive', 'is_active', 'active'])
+        const isActive = isCurrentStr === '1' || isCurrentStr === 'true' || isCurrentStr === 'TRUE'
+        // 额外字段
+        const memo = getValue(['notes', 'memo', 'description', 'note'])
+        const docUrl = getValue(['website_url', 'doc_url', 'website', 'document_url'])
         
-        // 解析 models/config JSON (支持 cc-switch v3.8.0+ 的 config_json 格式)
+        // 解析 settings_config JSON (cc-switch 实际格式)
+        // settings_config 结构示例:
+        // Claude: {"env":{"ANTHROPIC_AUTH_TOKEN":"xxx","ANTHROPIC_BASE_URL":"xxx",...}}
+        // Codex: {"auth":{"OPENAI_API_KEY":"xxx"},"config":"toml内容"}
+        // Gemini: {"env":{"GEMINI_API_KEY":"xxx"},"config":{...}}
+        let settingsConfig: Record<string, any> = {}
         let modelsData: Record<string, any> = {}
+        let extractedApiKey = apiKey
+        let extractedRequestUrl = requestUrl
+        
         try {
-          if (modelsStr && (modelsStr.startsWith('{') || modelsStr.startsWith('['))) {
-            const parsed = JSON.parse(modelsStr)
-            // cc-switch v3.8.0+ config_json 可能包含嵌套的 model、settings 等
-            if (parsed.model) {
-              modelsData = { main: parsed.model, ...parsed }
-            } else if (parsed.models) {
-              modelsData = parsed.models
-            } else {
-              modelsData = parsed
+          // 优先解析 settings_config (cc-switch 主要配置)
+          if (settingsConfigStr && settingsConfigStr.startsWith('{')) {
+            settingsConfig = JSON.parse(settingsConfigStr)
+            
+            // Claude 格式: env.ANTHROPIC_AUTH_TOKEN, env.ANTHROPIC_BASE_URL
+            if (settingsConfig.env) {
+              if (!extractedApiKey && settingsConfig.env.ANTHROPIC_AUTH_TOKEN) {
+                extractedApiKey = settingsConfig.env.ANTHROPIC_AUTH_TOKEN
+              }
+              if (!extractedRequestUrl && settingsConfig.env.ANTHROPIC_BASE_URL) {
+                extractedRequestUrl = settingsConfig.env.ANTHROPIC_BASE_URL
+              }
+              // Gemini 格式
+              if (!extractedApiKey && settingsConfig.env.GEMINI_API_KEY) {
+                extractedApiKey = settingsConfig.env.GEMINI_API_KEY
+              }
+              if (!extractedRequestUrl && settingsConfig.env.GOOGLE_GEMINI_BASE_URL) {
+                extractedRequestUrl = settingsConfig.env.GOOGLE_GEMINI_BASE_URL
+              }
+              // 提取模型配置
+              if (settingsConfig.env.ANTHROPIC_MODEL) {
+                modelsData.main = settingsConfig.env.ANTHROPIC_MODEL
+              }
+              if (settingsConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL) {
+                modelsData.haiku = settingsConfig.env.ANTHROPIC_DEFAULT_HAIKU_MODEL
+              }
+              if (settingsConfig.env.ANTHROPIC_DEFAULT_SONNET_MODEL) {
+                modelsData.sonnet = settingsConfig.env.ANTHROPIC_DEFAULT_SONNET_MODEL
+              }
+              if (settingsConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL) {
+                modelsData.opus = settingsConfig.env.ANTHROPIC_DEFAULT_OPUS_MODEL
+              }
             }
-          } else if (modelsStr) {
+            
+            // Codex 格式: auth.OPENAI_API_KEY, config (TOML string)
+            if (settingsConfig.auth) {
+              if (!extractedApiKey && settingsConfig.auth.OPENAI_API_KEY) {
+                extractedApiKey = settingsConfig.auth.OPENAI_API_KEY
+              }
+            }
+            if (settingsConfig.config && typeof settingsConfig.config === 'string') {
+              // 从 TOML 字符串提取 model 和 base_url
+              const modelMatch = settingsConfig.config.match(/model\s*=\s*"([^"]+)"/)
+              if (modelMatch) {
+                modelsData.main = modelMatch[1]
+              }
+              const baseUrlMatch = settingsConfig.config.match(/base_url\s*=\s*"([^"]+)"/)
+              if (baseUrlMatch && !extractedRequestUrl) {
+                extractedRequestUrl = baseUrlMatch[1]
+              }
+              // 提取 approval_policy 和 sandbox_mode
+              const approvalMatch = settingsConfig.config.match(/approval_policy\s*=\s*"([^"]+)"/)
+              if (approvalMatch) {
+                modelsData.approvalPolicy = approvalMatch[1]
+              }
+              const sandboxMatch = settingsConfig.config.match(/sandbox_mode\s*=\s*"([^"]+)"/)
+              if (sandboxMatch) {
+                modelsData.sandboxMode = sandboxMatch[1]
+              }
+              const reasoningMatch = settingsConfig.config.match(/model_reasoning_effort\s*=\s*"([^"]+)"/)
+              if (reasoningMatch) {
+                modelsData.modelReasoningEffort = reasoningMatch[1]
+              }
+            }
+          }
+          
+          // 备选: 解析旧格式的 models/config_json
+          if (modelsStr && modelsStr.startsWith('{')) {
+            const parsed = JSON.parse(modelsStr)
+            if (parsed.model) {
+              modelsData = { ...modelsData, main: parsed.model, ...parsed }
+            } else if (parsed.models) {
+              modelsData = { ...modelsData, ...parsed.models }
+            } else {
+              modelsData = { ...modelsData, ...parsed }
+            }
+          } else if (modelsStr && Object.keys(modelsData).length === 0) {
             modelsData = { main: modelsStr }
           }
-        } catch {
+        } catch (e) {
+          console.warn('[SQL Import] JSON 解析失败:', e)
           modelsData = { main: modelsStr || '' }
         }
+        
+        console.log(`[SQL Import] Provider "${name}": apiKey=${extractedApiKey ? '已提取' : '无'}, url=${extractedRequestUrl || '无'}, models=`, modelsData)
         
         const baseProvider = {
           id,
           name,
           notes: memo || '',
           websiteUrl: docUrl || '',
-          apiKey,
-          requestUrl,
+          apiKey: extractedApiKey || '',
+          requestUrl: extractedRequestUrl || '',
           configJson: {},
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -790,12 +896,21 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
             ...baseProvider,
             type: 'codex',
             model: modelsData.main || modelsData.model || '',
-            authJson: {},
+            authJson: settingsConfig.auth || {},
             approvalPolicy: (modelsData.approvalPolicy || modelsData.approval_policy) as CodexProvider['approvalPolicy'] || undefined,
             sandboxMode: (modelsData.sandboxMode || modelsData.sandbox_mode) as CodexProvider['sandboxMode'] || undefined,
-            modelProvider: modelsData.modelProvider || modelsData.model_provider || undefined
+            modelProvider: modelsData.modelProvider || modelsData.model_provider || undefined,
+            modelReasoningEffort: modelsData.modelReasoningEffort as CodexProvider['modelReasoningEffort'] || undefined
           }
-          provider.configJson = generateCodexConfigJson(provider)
+          // 如果有原始 TOML 配置，尝试保存
+          if (settingsConfig.config && typeof settingsConfig.config === 'string') {
+            provider.configJson = { 
+              config: settingsConfig.config,
+              auth: settingsConfig.auth 
+            }
+          } else {
+            provider.configJson = generateCodexConfigJson(provider)
+          }
           codexProviders.push(provider)
           if (isActive) codexActiveId = id
         } else if (providerType === 'gemini' || providerType === 'google') {
@@ -804,7 +919,12 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
             type: 'gemini',
             model: modelsData.main || modelsData.model || ''
           }
-          provider.configJson = generateGeminiConfigJson(provider)
+          // 如果有完整的 settingsConfig.env，直接使用
+          if (settingsConfig.env && Object.keys(settingsConfig.env).length > 0) {
+            provider.configJson = { env: settingsConfig.env, config: settingsConfig.config }
+          } else {
+            provider.configJson = generateGeminiConfigJson(provider)
+          }
           geminiProviders.push(provider)
           if (isActive) geminiActiveId = id
         } else {
@@ -817,7 +937,12 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
             sonnetModel: modelsData.sonnet || '',
             opusModel: modelsData.opus || ''
           }
-          provider.configJson = generateConfigJson(provider)
+          // 如果有完整的 settingsConfig.env，直接使用
+          if (settingsConfig.env && Object.keys(settingsConfig.env).length > 0) {
+            provider.configJson = { env: settingsConfig.env }
+          } else {
+            provider.configJson = generateConfigJson(provider)
+          }
           claudeProviders.push(provider)
           if (isActive) claudeActiveId = id
         }
@@ -1061,7 +1186,7 @@ export function importProvidersJSON(json: string): { success: boolean; count: nu
 }
 
 // 自动检测格式并导入
-export function importProviders(content: string): { success: boolean; count: number; error?: string; format?: string } {
+export function importProviders(content: string): { success: boolean; count: number; error?: string; format?: string; details?: { claude: number; codex: number; gemini: number } } {
   const trimmed = content.trim()
   
   // 检测是否为二进制 SQLite 数据库文件

@@ -2,30 +2,84 @@
 -- 格式兼容: cc-switch (https://github.com/farion1231/cc-switch)
 -- 使用说明: 将此文件导入到 cc_switcher 中，然后修改 apiKey 为你的实际密钥
 
+-- ============================================
+-- cc-switch 实际表结构
+-- 使用 'app_type' 字段区分: claude / codex / gemini
+-- 配置存储在 'settings_config' JSON 字段中
+-- ============================================
 DROP TABLE IF EXISTS providers;
 CREATE TABLE providers (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT DEFAULT 'claude',
+  id TEXT NOT NULL,
+  app_type TEXT NOT NULL,              -- cc-switch 使用 'app_type': claude/codex/gemini
   name TEXT NOT NULL,
-  apiKey TEXT NOT NULL,
-  apiUrl TEXT NOT NULL,
-  models TEXT,
-  isActive INTEGER DEFAULT 0,
-  createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
-  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+  settings_config TEXT NOT NULL,       -- JSON 格式的完整配置
+  website_url TEXT,                    -- 文档链接
+  category TEXT,                       -- 分类: official/cn_official/custom
+  created_at INTEGER,
+  sort_index INTEGER,
+  notes TEXT,                          -- 备注
+  icon TEXT,
+  icon_color TEXT,
+  meta TEXT NOT NULL DEFAULT '{}',
+  is_current BOOLEAN NOT NULL DEFAULT 0,  -- 当前激活状态
+  PRIMARY KEY (id, app_type)
 );
 
 -- ============================================
--- Claude Code 官方配置
--- 官网: https://claude.ai/code
--- 文档: https://docs.anthropic.com/
--- 配置文件: ~/.claude/settings.json
+-- cc-switch 实际格式示例
+-- 使用 'app_type' 字段区分类型
+-- 配置存储在 'settings_config' JSON 字段
 -- ============================================
 
--- Claude 官方 API (需要 Anthropic API Key)
+-- Claude 配置示例 (cc-switch 实际格式)
+-- settings_config.env 包含所有环境变量
+INSERT INTO providers (id, app_type, name, settings_config, website_url, category, notes, is_current) VALUES (
+  'uuid-claude-001', 
+  'claude',  -- 重要: cc-switch 使用 'app_type' 字段
+  'Claude 官方 API', 
+  '{"env":{"ANTHROPIC_AUTH_TOKEN":"sk-ant-api03-YOUR_API_KEY_HERE","ANTHROPIC_BASE_URL":"https://api.anthropic.com","ANTHROPIC_MODEL":"claude-sonnet-4-20250514","ANTHROPIC_DEFAULT_HAIKU_MODEL":"claude-3-5-haiku-20241022","ANTHROPIC_DEFAULT_SONNET_MODEL":"claude-sonnet-4-20250514","ANTHROPIC_DEFAULT_OPUS_MODEL":"claude-3-opus-20240229"}}',
+  'https://www.anthropic.com',
+  'official',
+  'Anthropic 官方 API',
+  1
+);
+
+-- Codex 配置示例 (cc-switch 实际格式)
+-- settings_config.auth 包含 OPENAI_API_KEY
+-- settings_config.config 包含 TOML 格式配置
+INSERT INTO providers (id, app_type, name, settings_config, website_url, category, notes, is_current) VALUES (
+  'uuid-codex-001', 
+  'codex',  -- 重要: cc-switch 使用 'app_type' 字段
+  'OpenAI Codex (官方)', 
+  '{"auth":{"OPENAI_API_KEY":"sk-YOUR_OPENAI_API_KEY_HERE"},"config":"model_provider = \"openai\"\nmodel = \"gpt-5.1-codex-max\"\nmodel_reasoning_effort = \"high\"\n[model_providers.openai]\nname = \"OpenAI\"\nbase_url = \"https://api.openai.com/v1\"\nwire_api = \"responses\""}',
+  'https://openai.com',
+  'official',
+  'OpenAI 官方 API',
+  0
+);
+
+-- Gemini 配置示例 (cc-switch 实际格式)
+-- settings_config.env 包含 GEMINI_API_KEY 和 GOOGLE_GEMINI_BASE_URL
+INSERT INTO providers (id, app_type, name, settings_config, website_url, category, notes, is_current) VALUES (
+  'uuid-gemini-001', 
+  'gemini',  -- 重要: cc-switch 使用 'app_type' 字段
+  'Google Gemini (官方)', 
+  '{"env":{"GEMINI_API_KEY":"YOUR_GOOGLE_API_KEY_HERE","GOOGLE_GEMINI_BASE_URL":"https://generativelanguage.googleapis.com/v1beta"},"config":{"selectedAuthType":"gemini-api-key"}}',
+  'https://ai.google.dev',
+  'official',
+  'Google AI Studio API',
+  0
+);
+
+-- ============================================
+-- cc-switch v3.7.x 兼容格式 (旧版)
+-- 使用 'type' 字段区分类型
+-- ============================================
+
+-- Claude 官方 API (v3.7.x 格式)
 INSERT INTO providers (id, type, name, apiKey, apiUrl, models, isActive, createdAt, updatedAt) VALUES (
   1, 
-  'claude', 
+  'claude',  -- v3.7.x 使用 'type' 字段
   'Claude 官方 API', 
   'sk-ant-api03-YOUR_API_KEY_HERE', 
   'https://api.anthropic.com', 
@@ -48,18 +102,10 @@ INSERT INTO providers (id, type, name, apiKey, apiUrl, models, isActive, created
   datetime('now')
 );
 
--- ============================================
--- OpenAI Codex 配置
--- 官网: https://openai.com/codex
--- 文档: https://platform.openai.com/docs
--- 配置文件: ~/.codex/config.toml
--- ============================================
-
--- OpenAI 官方 API
--- 注意: approvalPolicy 官方值为 on-request | never | untrusted | on-failure
+-- OpenAI 官方 API (v3.7.x 格式)
 INSERT INTO providers (id, type, name, apiKey, apiUrl, models, isActive, createdAt, updatedAt) VALUES (
   3, 
-  'codex', 
+  'codex',  -- v3.7.x 使用 'type' 字段
   'OpenAI Codex (官方)', 
   'sk-YOUR_OPENAI_API_KEY_HERE', 
   'https://api.openai.com/v1', 
