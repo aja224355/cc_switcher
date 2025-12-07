@@ -1,12 +1,57 @@
 # cc_switcher
 
-English | [中文](README_zh.md)
+[English](README.md) | 中文
 
-一个用于切换 Claude Code 账户的 CLI 工具，支持快速在不同 API 端点和认证令牌间切换。
+一个用于管理和切换 Claude Code 账户的工具，支持快速在不同 API 端点和认证令牌间切换。包含 CLI（shell 脚本）和 Web UI（React）两个版本。
 
-## 实现方式
+## 🚀 快速开始
 
-**纯 Shell 脚本实现** - 本工具完全使用 shell 脚本（bash/zsh）实现，而非 Python、Node.js 或其他运行时语言。
+### Web UI 版本
+
+#### 安装
+
+```bash
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 构建生产版本
+npm run build
+
+# 预览生产构建
+npm run preview
+```
+
+#### 使用方法
+
+1. **访问界面**：在浏览器中打开 `http://localhost:5173`（或终端显示的端口）
+
+2. **添加供应商**：点击"添加供应商"按钮添加新的 API 供应商配置
+   - 填写供应商名称、API 基础 URL 和认证令牌
+   - 选择环境模式：本地 (Local) / WSL / SSH Remote
+   - 对于 SSH Remote，配置主机、端口、用户名、SSH 密钥路径和可选的工作目录
+
+3. **管理供应商**：
+   - 在列表中查看所有已配置的供应商
+   - 点击"使用此配置"激活某个供应商
+   - 点击"编辑"修改现有配置
+   - 点击"删除"移除供应商
+
+4. **导入/导出**：
+   - **导出**：点击"导出配置"将配置下载为 JSON 或 SQL 文件
+   - **导入**：点击"导入配置"上传并恢复配置文件
+   - SQL 格式与 CLI 版本的数据库兼容
+
+5. **多环境支持**：
+   - 本地、WSL 和远程 Linux 可以共用同一个 SQL 配置文件
+   - 每个环境可以独立选择当前激活的供应商
+   - 配置更改存储在浏览器的 localStorage 中
+
+### CLI 版本（Shell 脚本）
+
+**纯 Shell 脚本实现** - CLI 工具完全使用 shell 脚本（bash/zsh）实现，而非 Python、Node.js 或其他运行时语言。
 
 ### 为什么选择 Shell 脚本？
 

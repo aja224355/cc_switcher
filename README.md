@@ -2,11 +2,56 @@
 
 [中文](README_zh.md) | English
 
-A CLI tool for switching Claude Code accounts, supporting quick switching between different API endpoints and authentication tokens.
+A management tool for switching Claude Code accounts, supporting quick switching between different API endpoints and authentication tokens. Includes both CLI (shell script) and Web UI (React) versions.
 
-## Implementation
+## 🚀 Quick Start
 
-**Pure Shell Script Implementation** - This tool is implemented entirely in shell script (bash/zsh), not Python, Node.js, or other runtime languages.
+### Web UI Version
+
+#### Installation
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+#### Usage
+
+1. **Access the UI**: Open your browser and navigate to `http://localhost:5173` (or the port shown in terminal)
+
+2. **Add Provider**: Click "添加供应商" button to add a new API provider configuration
+   - Fill in provider name, API base URL, and authentication token
+   - Select environment mode: Local / WSL / SSH Remote
+   - For SSH Remote, configure host, port, username, SSH key path, and optional working directory
+
+3. **Manage Providers**: 
+   - View all configured providers in the list
+   - Click "使用此配置" to activate a provider
+   - Click "编辑" to modify existing configuration
+   - Click "删除" to remove a provider
+
+4. **Import/Export**:
+   - **Export**: Click "导出配置" to download configuration as JSON or SQL file
+   - **Import**: Click "导入配置" to upload and restore configuration from file
+   - SQL format is compatible with the CLI version's database
+
+5. **Multi-Environment Support**:
+   - Local, WSL, and Remote Linux can share the same SQL configuration file
+   - Each environment can independently select its active provider
+   - Configuration changes are stored in browser localStorage
+
+### CLI Version (Shell Script)
+
+**Pure Shell Script Implementation** - The CLI tool is implemented entirely in shell script (bash/zsh), not Python, Node.js, or other runtime languages.
 
 ### Why Shell Script?
 
