@@ -2,7 +2,7 @@
 export type ProviderType = 'claude' | 'codex' | 'gemini'
 
 // 环境模式
-export type EnvironmentMode = 'local' | 'remote'
+export type EnvironmentMode = 'local' | 'wsl' | 'remote'
 
 // 认证模式
 export type AuthMode = 'plan' | 'apikey'
@@ -16,6 +16,8 @@ export interface SSHRemote {
   username: string
   sshKeyPath: string
   isActive: boolean
+  // 可选：在远程服务器或 WSL 中使用的工作目录（例如代码仓库路径）
+  workingDirectory?: string
 }
 
 // 基础供应商接口

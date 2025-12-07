@@ -596,7 +596,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
 
           {/* Environment Mode Selection */}
           <div className="border-t border-[#3d3d5c] pt-6">
-            <label className="input-label mb-3">运行环境</label>
+            <label className="input-label mb-3">当前环境</label>
             <div className="flex gap-4">
               <button
                 type="button"
@@ -612,8 +612,26 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
               >
                 <Monitor className="w-5 h-5" />
                 <div className="text-left">
-                  <div className="font-medium">本地</div>
-                  <div className="text-xs opacity-70">在本机运行</div>
+                  <div className="font-medium">本地 (Local)</div>
+                  <div className="text-xs opacity-70">在当前电脑本地运行</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const handler = getCurrentHandler()
+                  handler('environmentMode' as any, 'wsl')
+                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  getCurrentFormData().environmentMode === 'wsl'
+                    ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-white'
+                    : 'border-[#3d3d5c] bg-[#2d2d44] text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                <Monitor className="w-5 h-5" />
+                <div className="text-left">
+                  <div className="font-medium">WSL</div>
+                  <div className="text-xs opacity-70">通过 WSL 环境运行</div>
                 </div>
               </button>
               <button
@@ -752,6 +770,30 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
                             value={remote.sshKeyPath}
                             onChange={(e) => updateSSHRemote(remote.id, 'sshKeyPath', e.target.value)}
                           />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-gray-500 mb-1 block flex items-center gap-1">
+                            <FolderOpen className="w-3 h-3" />
+                            WSL 工作目录（可选）
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              className="input-field text-sm font-mono flex-1"
+                              placeholder="例如：/mnt/c/Users/you/project 或 \\wsl$\\Ubuntu\\home\\you\\project"
+                              value={remote.workingDirectory ?? ''}
+                              onChange={(e) => updateSSHRemote(remote.id, 'workingDirectory', e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="btn-secondary whitespace-nowrap"
+                            >
+                              选择文件夹
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            建议填写 WSL 中代码所在目录，方便在其他工具中保持一致的路径配置
+                          </p>
                         </div>
                       </div>
                     </div>
