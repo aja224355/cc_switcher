@@ -242,7 +242,10 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
           opusModel: models.opus || '',
           configJson: {},
           createdAt: Date.now(),
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
+          environmentMode: 'local',
+          sshRemotes: [],
+          activeRemoteId: null
         }
         
         provider.configJson = generateConfigJson(provider)
@@ -322,22 +325,29 @@ export function importProvidersJSON(json: string): { success: boolean; count: nu
     
     if (Array.isArray(data)) {
       // 验证并处理每个 provider
-      const providers: ClaudeProvider[] = data.map(item => ({
-        id: item.id || uuidv4(),
-        type: 'claude' as const,
-        name: item.name || '未命名',
-        notes: item.notes || '',
-        websiteUrl: item.websiteUrl || '',
-        apiKey: item.apiKey || '',
-        requestUrl: item.requestUrl || '',
-        mainModel: item.mainModel || '',
-        haikuModel: item.haikuModel || '',
-        sonnetModel: item.sonnetModel || '',
-        opusModel: item.opusModel || '',
-        configJson: item.configJson || generateConfigJson(item),
-        createdAt: item.createdAt || Date.now(),
-        updatedAt: item.updatedAt || Date.now()
-      }))
+      const providers: ClaudeProvider[] = data.map(item => {
+        const provider: ClaudeProvider = {
+          id: item.id || uuidv4(),
+          type: 'claude' as const,
+          name: item.name || '未命名',
+          notes: item.notes || '',
+          websiteUrl: item.websiteUrl || '',
+          apiKey: item.apiKey || '',
+          requestUrl: item.requestUrl || '',
+          mainModel: item.mainModel || '',
+          haikuModel: item.haikuModel || '',
+          sonnetModel: item.sonnetModel || '',
+          opusModel: item.opusModel || '',
+          configJson: {},
+          createdAt: item.createdAt || Date.now(),
+          updatedAt: item.updatedAt || Date.now(),
+          environmentMode: item.environmentMode || 'local',
+          sshRemotes: item.sshRemotes || [],
+          activeRemoteId: item.activeRemoteId || null
+        }
+        provider.configJson = item.configJson || generateConfigJson(provider)
+        return provider
+      })
       
       saveProviders(providers)
       return { success: true, count: providers.length }

@@ -234,7 +234,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
         environmentMode: claudeFormData.environmentMode,
         sshRemotes: claudeFormData.sshRemotes,
         activeRemoteId: claudeFormData.activeRemoteId,
-        configJson: generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0 } as ClaudeProvider),
+        configJson: generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0, environmentMode: claudeFormData.environmentMode, sshRemotes: claudeFormData.sshRemotes, activeRemoteId: claudeFormData.activeRemoteId } as ClaudeProvider),
         createdAt: provider?.createdAt || now,
         updatedAt: now,
       }
@@ -287,7 +287,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
 
   const getConfigJson = () => {
     if (providerType === 'claude') {
-      return generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0 } as ClaudeProvider)
+      return generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0, environmentMode: claudeFormData.environmentMode, sshRemotes: claudeFormData.sshRemotes, activeRemoteId: claudeFormData.activeRemoteId } as ClaudeProvider)
     } else if (providerType === 'codex') {
       let authJson = {}
       try {
