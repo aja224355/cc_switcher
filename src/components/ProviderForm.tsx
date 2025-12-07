@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Lightbulb, Zap, ExternalLink } from 'lucide-react'
-import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType } from '@/types/provider'
+import { ArrowLeft, Lightbulb, Zap, ExternalLink, Plus, Trash2, Monitor, Server, Key } from 'lucide-react'
+import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, SSHRemote, EnvironmentMode } from '@/types/provider'
 import { generateConfigJson, generateCodexConfigJson, generateGeminiConfigJson } from '@/utils/storage'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -24,6 +24,9 @@ interface ClaudeFormData {
   haikuModel: string
   sonnetModel: string
   opusModel: string
+  environmentMode: EnvironmentMode
+  sshRemotes: SSHRemote[]
+  activeRemoteId: string | null
 }
 
 // Codex 表单数据
@@ -35,6 +38,9 @@ interface CodexFormData {
   requestUrl: string
   model: string
   authJson: string
+  environmentMode: EnvironmentMode
+  sshRemotes: SSHRemote[]
+  activeRemoteId: string | null
 }
 
 // Gemini 表单数据
@@ -45,6 +51,9 @@ interface GeminiFormData {
   apiKey: string
   requestUrl: string
   model: string
+  environmentMode: EnvironmentMode
+  sshRemotes: SSHRemote[]
+  activeRemoteId: string | null
 }
 
 const initialClaudeFormData: ClaudeFormData = {
@@ -57,6 +66,9 @@ const initialClaudeFormData: ClaudeFormData = {
   haikuModel: '',
   sonnetModel: '',
   opusModel: '',
+  environmentMode: 'local',
+  sshRemotes: [],
+  activeRemoteId: null,
 }
 
 const initialCodexFormData: CodexFormData = {
@@ -67,6 +79,9 @@ const initialCodexFormData: CodexFormData = {
   requestUrl: '',
   model: '',
   authJson: '',
+  environmentMode: 'local',
+  sshRemotes: [],
+  activeRemoteId: null,
 }
 
 const initialGeminiFormData: GeminiFormData = {
@@ -76,6 +91,9 @@ const initialGeminiFormData: GeminiFormData = {
   apiKey: '',
   requestUrl: '',
   model: '',
+  environmentMode: 'local',
+  sshRemotes: [],
+  activeRemoteId: null,
 }
 
 export default function ProviderForm({ provider, providerType, onSave, onCancel }: ProviderFormProps) {
@@ -98,6 +116,9 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
           haikuModel: p.haikuModel,
           sonnetModel: p.sonnetModel,
           opusModel: p.opusModel,
+          environmentMode: p.environmentMode || 'local',
+          sshRemotes: p.sshRemotes || [],
+          activeRemoteId: p.activeRemoteId || null,
         })
       } else if (provider.type === 'codex') {
         const p = provider as CodexProvider
@@ -109,6 +130,9 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
           requestUrl: p.requestUrl,
           model: p.model,
           authJson: JSON.stringify(p.authJson || {}, null, 2),
+          environmentMode: p.environmentMode || 'local',
+          sshRemotes: p.sshRemotes || [],
+          activeRemoteId: p.activeRemoteId || null,
         })
       } else if (provider.type === 'gemini') {
         const p = provider as GeminiProvider
@@ -119,21 +143,76 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
           apiKey: p.apiKey,
           requestUrl: p.requestUrl,
           model: p.model,
+          environmentMode: p.environmentMode || 'local',
+          sshRemotes: p.sshRemotes || [],
+          activeRemoteId: p.activeRemoteId || null,
         })
       }
     }
   }, [provider])
 
-  const handleClaudeChange = (field: keyof ClaudeFormData, value: string) => {
+  const handleClaudeChange = (field: keyof ClaudeFormData, value: string | EnvironmentMode | SSHRemote[] | null) => {
     setClaudeFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleCodexChange = (field: keyof CodexFormData, value: string) => {
+  const handleCodexChange = (field: keyof CodexFormData, value: string | EnvironmentMode | SSHRemote[] | null) => {
     setCodexFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleGeminiChange = (field: keyof GeminiFormData, value: string) => {
+  const handleGeminiChange = (field: keyof GeminiFormData, value: string | EnvironmentMode | SSHRemote[] | null) => {
     setGeminiFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  // SSH Remote 管理函数
+  const getCurrentFormData = () => {
+    if (providerType === 'claude') return claudeFormData
+    if (providerType === 'codex') return codexFormData
+    return geminiFormData
+  }
+
+  const getCurrentHandler = () => {
+    if (providerType === 'claude') return handleClaudeChange
+    if (providerType === 'codex') return handleCodexChange
+    return handleGeminiChange
+  }
+
+  const addSSHRemote = () => {
+    const newRemote: SSHRemote = {
+      id: uuidv4(),
+      name: '',
+      host: '',
+      port: 22,
+      username: '',
+      sshKeyPath: '',
+      isActive: false,
+    }
+    const handler = getCurrentHandler()
+    const currentData = getCurrentFormData()
+    handler('sshRemotes' as any, [...currentData.sshRemotes, newRemote])
+  }
+
+  const updateSSHRemote = (id: string, field: keyof SSHRemote, value: string | number | boolean) => {
+    const handler = getCurrentHandler()
+    const currentData = getCurrentFormData()
+    const updatedRemotes = currentData.sshRemotes.map(remote =>
+      remote.id === id ? { ...remote, [field]: value } : remote
+    )
+    handler('sshRemotes' as any, updatedRemotes)
+  }
+
+  const removeSSHRemote = (id: string) => {
+    const handler = getCurrentHandler()
+    const currentData = getCurrentFormData()
+    const updatedRemotes = currentData.sshRemotes.filter(remote => remote.id !== id)
+    handler('sshRemotes' as any, updatedRemotes)
+    if (currentData.activeRemoteId === id) {
+      handler('activeRemoteId' as any, null)
+    }
+  }
+
+  const setActiveRemote = (id: string | null) => {
+    const handler = getCurrentHandler()
+    handler('activeRemoteId' as any, id)
   }
 
   const handleSubmit = () => {
@@ -143,7 +222,18 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
       const newProvider: ClaudeProvider = {
         id: provider?.id || uuidv4(),
         type: 'claude',
-        ...claudeFormData,
+        name: claudeFormData.name,
+        notes: claudeFormData.notes,
+        websiteUrl: claudeFormData.websiteUrl,
+        apiKey: claudeFormData.apiKey,
+        requestUrl: claudeFormData.requestUrl,
+        mainModel: claudeFormData.mainModel,
+        haikuModel: claudeFormData.haikuModel,
+        sonnetModel: claudeFormData.sonnetModel,
+        opusModel: claudeFormData.opusModel,
+        environmentMode: claudeFormData.environmentMode,
+        sshRemotes: claudeFormData.sshRemotes,
+        activeRemoteId: claudeFormData.activeRemoteId,
         configJson: generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0 } as ClaudeProvider),
         createdAt: provider?.createdAt || now,
         updatedAt: now,
@@ -166,6 +256,9 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
         requestUrl: codexFormData.requestUrl,
         model: codexFormData.model,
         authJson,
+        environmentMode: codexFormData.environmentMode,
+        sshRemotes: codexFormData.sshRemotes,
+        activeRemoteId: codexFormData.activeRemoteId,
         configJson: generateCodexConfigJson({ ...codexFormData, authJson }),
         createdAt: provider?.createdAt || now,
         updatedAt: now,
@@ -175,7 +268,15 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
       const newProvider: GeminiProvider = {
         id: provider?.id || uuidv4(),
         type: 'gemini',
-        ...geminiFormData,
+        name: geminiFormData.name,
+        notes: geminiFormData.notes,
+        websiteUrl: geminiFormData.websiteUrl,
+        apiKey: geminiFormData.apiKey,
+        requestUrl: geminiFormData.requestUrl,
+        model: geminiFormData.model,
+        environmentMode: geminiFormData.environmentMode,
+        sshRemotes: geminiFormData.sshRemotes,
+        activeRemoteId: geminiFormData.activeRemoteId,
         configJson: generateGeminiConfigJson(geminiFormData),
         createdAt: provider?.createdAt || now,
         updatedAt: now,
@@ -430,6 +531,178 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
                 可选：指定默认使用的 Gemini 模型，留空则使用系统默认。
               </p>
             </>
+          )}
+
+          {/* Environment Mode Selection */}
+          <div className="border-t border-[#3d3d5c] pt-6">
+            <label className="input-label mb-3">运行环境</label>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const handler = getCurrentHandler()
+                  handler('environmentMode' as any, 'local')
+                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  getCurrentFormData().environmentMode === 'local'
+                    ? 'border-[#e94560] bg-[#e94560]/10 text-white'
+                    : 'border-[#3d3d5c] bg-[#2d2d44] text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                <Monitor className="w-5 h-5" />
+                <div className="text-left">
+                  <div className="font-medium">本地</div>
+                  <div className="text-xs opacity-70">在本机运行</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const handler = getCurrentHandler()
+                  handler('environmentMode' as any, 'remote')
+                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  getCurrentFormData().environmentMode === 'remote'
+                    ? 'border-[#10b981] bg-[#10b981]/10 text-white'
+                    : 'border-[#3d3d5c] bg-[#2d2d44] text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                <Server className="w-5 h-5" />
+                <div className="text-left">
+                  <div className="font-medium">SSH Remote</div>
+                  <div className="text-xs opacity-70">通过 SSH 连接远程服务器</div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* SSH Remote Configuration */}
+          {getCurrentFormData().environmentMode === 'remote' && (
+            <div className="border border-[#3d3d5c] rounded-lg p-4 bg-[#2d2d44]/50">
+              <div className="flex items-center justify-between mb-4">
+                <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
+                  <Server className="w-4 h-4" />
+                  SSH Remote 配置
+                </label>
+                <button
+                  type="button"
+                  onClick={addSSHRemote}
+                  className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg bg-[#10b981] hover:bg-[#059669] transition-colors text-white"
+                >
+                  <Plus className="w-4 h-4" />
+                  添加 Remote
+                </button>
+              </div>
+
+              {getCurrentFormData().sshRemotes.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Server className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>暂无 SSH Remote 配置</p>
+                  <p className="text-xs mt-1">点击上方按钮添加远程服务器</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {getCurrentFormData().sshRemotes.map((remote, index) => (
+                    <div
+                      key={remote.id}
+                      className={`border rounded-lg p-4 transition-all ${
+                        getCurrentFormData().activeRemoteId === remote.id
+                          ? 'border-[#10b981] bg-[#10b981]/5'
+                          : 'border-[#3d3d5c] bg-[#1a1a2e]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="activeRemote"
+                            checked={getCurrentFormData().activeRemoteId === remote.id}
+                            onChange={() => setActiveRemote(remote.id)}
+                            className="w-4 h-4 text-[#10b981]"
+                          />
+                          <span className="text-sm font-medium text-gray-300">
+                            Remote #{index + 1}
+                          </span>
+                          {getCurrentFormData().activeRemoteId === remote.id && (
+                            <span className="text-xs px-2 py-0.5 rounded bg-[#10b981] text-white">
+                              当前激活
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeSSHRemote(remote.id)}
+                          className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">名称</label>
+                          <input
+                            type="text"
+                            className="input-field text-sm"
+                            placeholder="例如：开发服务器"
+                            value={remote.name}
+                            onChange={(e) => updateSSHRemote(remote.id, 'name', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">主机地址</label>
+                          <input
+                            type="text"
+                            className="input-field text-sm"
+                            placeholder="192.168.1.100 或 hostname"
+                            value={remote.host}
+                            onChange={(e) => updateSSHRemote(remote.id, 'host', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">端口</label>
+                          <input
+                            type="number"
+                            className="input-field text-sm"
+                            placeholder="22"
+                            value={remote.port}
+                            onChange={(e) => updateSSHRemote(remote.id, 'port', parseInt(e.target.value) || 22)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">用户名</label>
+                          <input
+                            type="text"
+                            className="input-field text-sm"
+                            placeholder="root"
+                            value={remote.username}
+                            onChange={(e) => updateSSHRemote(remote.id, 'username', e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-gray-500 mb-1 block flex items-center gap-1">
+                            <Key className="w-3 h-3" />
+                            SSH Key 路径
+                          </label>
+                          <input
+                            type="text"
+                            className="input-field text-sm font-mono"
+                            placeholder="~/.ssh/id_rsa"
+                            value={remote.sshKeyPath}
+                            onChange={(e) => updateSSHRemote(remote.id, 'sshKeyPath', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="warning-box mt-4">
+                <Lightbulb className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <span>确保 SSH Key 已添加到远程服务器的 authorized_keys 中</span>
+              </div>
+            </div>
           )}
 
           {/* Config JSON Preview */}
