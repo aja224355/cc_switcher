@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import ProviderList from '@/components/ProviderList'
 import ProviderForm from '@/components/ProviderForm'
-import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, EnvironmentMode, EnvironmentActiveProviders } from '@/types/provider'
+import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, EnvironmentMode, EnvironmentActiveProviders, RemoteEnvironment } from '@/types/provider'
 import {
   getProviders,
   addProvider,
@@ -36,6 +36,12 @@ import {
   getEnvActiveProviders,
   setEnvActiveProvider,
   applyProviderToCurrentEnv,
+  getRemoteEnvironments,
+  addRemoteEnvironment,
+  deleteRemoteEnvironment,
+  getRemoteEnvMode,
+  isRemoteEnvMode,
+  parseRemoteEnvMode,
 } from '@/utils/storage'
 
 type View = 'list' | 'form'
@@ -64,9 +70,19 @@ function ConfigManager() {
   const [envActiveProviders, setEnvActiveProviders] = useState<EnvironmentActiveProviders>(
     getEnvActiveProviders(activeTab)
   )
+  // 远程环境列表
+  const [remoteEnvironments, setRemoteEnvironments] = useState<RemoteEnvironment[]>(getRemoteEnvironments())
+  // 添加远程环境对话框
+  const [showAddRemoteDialog, setShowAddRemoteDialog] = useState(false)
+  const [newRemoteName, setNewRemoteName] = useState('')
+  const [newRemoteHost, setNewRemoteHost] = useState('')
+  const [newRemotePort, setNewRemotePort] = useState('22')
+  const [newRemoteUsername, setNewRemoteUsername] = useState('')
+  const [newRemoteSshKeyPath, setNewRemoteSshKeyPath] = useState('~/.ssh/id_rsa')
 
   useEffect(() => {
     loadProviders()
+    setRemoteEnvironments(getRemoteEnvironments())
   }, [])
 
   useEffect(() => {
@@ -170,7 +186,7 @@ function ConfigManager() {
 
   // 一键应用配置
   const handleApplyConfig = (providerId: string) => {
-    const result = applyProviderToCurrentEnv(activeTab, providerId)
+    const result = applyProviderToCurrentEnv(activeTab, providerId, currentEnvMode, remoteEnvironments)
     
     if (result.success && result.script) {
       // 创建下载
@@ -178,7 +194,18 @@ function ConfigManager() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `apply-${activeTab}-${currentEnvMode}.sh`
+      // 生成更有意义的文件名
+      let filename = `apply-${activeTab}`
+      if (currentEnvMode === 'local') {
+        filename += '-local'
+      } else if (currentEnvMode === 'wsl') {
+        filename += '-wsl'
+      } else if (isRemoteEnvMode(currentEnvMode)) {
+        const remoteId = parseRemoteEnvMode(currentEnvMode)
+        const remote = remoteEnvironments.find(r => r.id === remoteId)
+        filename += `-${remote?.name || 'remote'}`
+      }
+      a.download = `${filename}.sh`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -187,6 +214,47 @@ function ConfigManager() {
       alert(`${result.message}\n\n脚本已下载，请在终端中运行。`)
     } else {
       alert(result.message)
+    }
+  }
+
+  // 添加远程环境
+  const handleAddRemoteEnv = () => {
+    setShowAddRemoteDialog(true)
+  }
+
+  // 确认添加远程环境
+  const handleConfirmAddRemote = () => {
+    if (!newRemoteName.trim() || !newRemoteHost.trim() || !newRemoteUsername.trim()) {
+      alert('请填写完整的远程环境信息')
+      return
+    }
+    
+    addRemoteEnvironment({
+      name: newRemoteName.trim(),
+      host: newRemoteHost.trim(),
+      port: parseInt(newRemotePort) || 22,
+      username: newRemoteUsername.trim(),
+      sshKeyPath: newRemoteSshKeyPath.trim() || '~/.ssh/id_rsa',
+    })
+    
+    setRemoteEnvironments(getRemoteEnvironments())
+    setShowAddRemoteDialog(false)
+    // 重置表单
+    setNewRemoteName('')
+    setNewRemoteHost('')
+    setNewRemotePort('22')
+    setNewRemoteUsername('')
+    setNewRemoteSshKeyPath('~/.ssh/id_rsa')
+  }
+
+  // 删除远程环境
+  const handleDeleteRemoteEnv = (id: string) => {
+    deleteRemoteEnvironment(id)
+    setRemoteEnvironments(getRemoteEnvironments())
+    
+    // 如果当前选中的是被删除的远程环境，切换到本地
+    if (currentEnvMode === getRemoteEnvMode(id)) {
+      handleEnvModeChange('local')
     }
   }
 
@@ -350,6 +418,10 @@ function ConfigManager() {
           onEnvModeChange={handleEnvModeChange}
           onEnvActivate={handleEnvActivate}
           onApplyConfig={handleApplyConfig}
+          // 远程环境管理
+          remoteEnvironments={remoteEnvironments}
+          onAddRemoteEnv={handleAddRemoteEnv}
+          onDeleteRemoteEnv={handleDeleteRemoteEnv}
         />
       ) : (
         <ProviderForm
@@ -358,6 +430,95 @@ function ConfigManager() {
           onSave={handleSave}
           onCancel={() => setView('list')}
         />
+      )}
+
+      {/* 添加远程环境对话框 */}
+      {showAddRemoteDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#252542] rounded-xl p-6 w-full max-w-md border border-[#3d3d5c]">
+            <h3 className="text-lg font-semibold text-white mb-4">添加远程环境</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">环境名称 *</label>
+                <input
+                  type="text"
+                  value={newRemoteName}
+                  onChange={(e) => setNewRemoteName(e.target.value)}
+                  placeholder="例如: 生产服务器"
+                  className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#3d3d5c] rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">主机地址 *</label>
+                <input
+                  type="text"
+                  value={newRemoteHost}
+                  onChange={(e) => setNewRemoteHost(e.target.value)}
+                  placeholder="例如: 192.168.1.100 或 my-server.com"
+                  className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#3d3d5c] rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">端口</label>
+                  <input
+                    type="number"
+                    value={newRemotePort}
+                    onChange={(e) => setNewRemotePort(e.target.value)}
+                    placeholder="22"
+                    className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#3d3d5c] rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">用户名 *</label>
+                  <input
+                    type="text"
+                    value={newRemoteUsername}
+                    onChange={(e) => setNewRemoteUsername(e.target.value)}
+                    placeholder="root"
+                    className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#3d3d5c] rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">SSH 密钥路径</label>
+                <input
+                  type="text"
+                  value={newRemoteSshKeyPath}
+                  onChange={(e) => setNewRemoteSshKeyPath(e.target.value)}
+                  placeholder="~/.ssh/id_rsa"
+                  className="w-full px-3 py-2 bg-[#1a1a2e] border border-[#3d3d5c] rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAddRemoteDialog(false)
+                  setNewRemoteName('')
+                  setNewRemoteHost('')
+                  setNewRemotePort('22')
+                  setNewRemoteUsername('')
+                  setNewRemoteSshKeyPath('~/.ssh/id_rsa')
+                }}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmAddRemote}
+                className="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

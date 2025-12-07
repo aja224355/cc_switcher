@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Check, Copy, Download, Upload, Settings, ExternalLink, FileJson, Database, FileCode, Terminal, Play, Rocket, Monitor, Box, Server, Zap } from 'lucide-react'
-import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, EnvironmentMode, EnvironmentActiveProviders } from '@/types/provider'
+import { Plus, Edit2, Trash2, Check, Copy, Download, Upload, Settings, ExternalLink, FileJson, Database, FileCode, Terminal, Play, Rocket, Monitor, Box, Server, Zap, PlusCircle, X } from 'lucide-react'
+import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, EnvironmentMode, EnvironmentActiveProviders, RemoteEnvironment } from '@/types/provider'
 
 type Provider = ClaudeProvider | CodexProvider | GeminiProvider
 type ExportFormat = 'json' | 'sql' | 'sql-all' | 'claude-settings' | 'codex-toml' | 'shell-env' | 'connection-cmd' | 'deploy-script' | 'wsl-apply'
@@ -32,6 +32,11 @@ interface ProviderListProps {
   onEnvModeChange?: (mode: EnvironmentMode) => void
   onEnvActivate?: (providerId: string, envMode: EnvironmentMode) => void
   onApplyConfig?: (providerId: string) => void
+  // 远程环境管理
+  remoteEnvironments?: RemoteEnvironment[]
+  onAddRemoteEnv?: () => void
+  onEditRemoteEnv?: (env: RemoteEnvironment) => void
+  onDeleteRemoteEnv?: (id: string) => void
 }
 
 export default function ProviderList({
@@ -50,14 +55,35 @@ export default function ProviderList({
   onExportFormat,
   onCloseExportMenu,
   currentEnvMode = 'local',
-  envActiveProviders = { local: null, wsl: null, remote: null },
+  envActiveProviders = { local: null, wsl: null },
   onEnvModeChange,
   onEnvActivate,
   onApplyConfig,
+  remoteEnvironments = [],
+  onAddRemoteEnv,
+  onEditRemoteEnv,
+  onDeleteRemoteEnv,
 }: ProviderListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const [showEnvPanel, setShowEnvPanel] = useState(true)
+
+  // 辅助函数：判断是否为远程环境
+  const isRemoteMode = (mode: EnvironmentMode) => mode.startsWith('remote:')
+  const getRemoteId = (mode: EnvironmentMode) => mode.startsWith('remote:') ? mode.substring(7) : null
+  const getRemoteEnvMode = (remoteId: string): EnvironmentMode => `remote:${remoteId}` as EnvironmentMode
+
+  // 获取当前环境模式的显示名称
+  const getEnvModeLabel = (mode: EnvironmentMode): string => {
+    if (mode === 'local') return '本地'
+    if (mode === 'wsl') return 'WSL'
+    const remoteId = getRemoteId(mode)
+    if (remoteId) {
+      const remote = remoteEnvironments.find(r => r.id === remoteId)
+      return remote ? remote.name : 'Remote'
+    }
+    return mode
+  }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -271,7 +297,7 @@ export default function ProviderList({
               </div>
               <div>
                 <h3 className="font-medium text-white">环境模式配置</h3>
-                <p className="text-xs text-gray-500">为本地、WSL、Remote 分别设置激活的供应商</p>
+                <p className="text-xs text-gray-500">为本地、WSL、多个 Remote 分别设置激活的供应商</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -283,7 +309,7 @@ export default function ProviderList({
                   currentEnvMode === 'wsl' ? 'bg-orange-500/20 text-orange-400' :
                   'bg-blue-500/20 text-blue-400'
                 }`}>
-                  {currentEnvMode === 'local' ? '本地' : currentEnvMode === 'wsl' ? 'WSL' : 'Remote'}
+                  {getEnvModeLabel(currentEnvMode)}
                 </span>
               </div>
               <svg 
@@ -299,7 +325,7 @@ export default function ProviderList({
           
           {showEnvPanel && (
             <div className="mt-4 pt-4 border-t border-[#3d3d5c]">
-              {/* 环境模式切换按钮 */}
+              {/* 环境模式切换按钮 - 本地和WSL */}
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={() => onEnvModeChange?.('local')}
@@ -323,21 +349,67 @@ export default function ProviderList({
                   <Box className="w-5 h-5" />
                   <span className="font-medium">WSL</span>
                 </button>
-                <button
-                  onClick={() => onEnvModeChange?.('remote')}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all ${
-                    currentEnvMode === 'remote'
-                      ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                      : 'border-[#3d3d5c] hover:border-blue-500/50 text-gray-400 hover:text-blue-400'
-                  }`}
-                >
-                  <Server className="w-5 h-5" />
-                  <span className="font-medium">Remote</span>
-                </button>
+              </div>
+
+              {/* 远程环境列表 */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-300">远程环境</span>
+                  {onAddRemoteEnv && (
+                    <button
+                      onClick={onAddRemoteEnv}
+                      className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                    >
+                      <PlusCircle className="w-3 h-3" />
+                      添加远程
+                    </button>
+                  )}
+                </div>
+                {remoteEnvironments.length === 0 ? (
+                  <div className="text-xs text-gray-500 p-3 border border-dashed border-[#3d3d5c] rounded-lg text-center">
+                    暂无远程环境，点击"添加远程"创建
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {remoteEnvironments.map((remote) => {
+                      const remoteMode = getRemoteEnvMode(remote.id)
+                      const isActive = currentEnvMode === remoteMode
+                      return (
+                        <button
+                          key={remote.id}
+                          onClick={() => onEnvModeChange?.(remoteMode)}
+                          className={`group flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                            isActive
+                              ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                              : 'border-[#3d3d5c] hover:border-blue-500/50 text-gray-400 hover:text-blue-400'
+                          }`}
+                        >
+                          <Server className="w-4 h-4" />
+                          <span className="font-medium text-sm">{remote.name}</span>
+                          <span className="text-xs opacity-60">({remote.host})</span>
+                          {onDeleteRemoteEnv && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (confirm(`确定删除远程环境 "${remote.name}" 吗？`)) {
+                                  onDeleteRemoteEnv(remote.id)
+                                }
+                              }}
+                              className="ml-1 p-0.5 rounded hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="删除"
+                            >
+                              <X className="w-3 h-3 text-red-400" />
+                            </button>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
               
               {/* 各环境模式激活的供应商 */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 {/* 本地环境 */}
                 <div 
                   className={`p-3 rounded-lg border ${
@@ -421,49 +493,69 @@ export default function ProviderList({
                     <div className="text-xs text-gray-500">未设置</div>
                   )}
                 </div>
-
-                {/* Remote 环境 */}
-                <div 
-                  className={`p-3 rounded-lg border ${
-                    currentEnvMode === 'remote' 
-                      ? 'border-blue-500/50 bg-blue-500/5' 
-                      : 'border-[#3d3d5c] bg-[#1a1a2e]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-xs font-medium ${
-                      currentEnvMode === 'remote' ? 'text-blue-400' : 'text-gray-500'
-                    }`}>
-                      Remote环境
-                    </span>
-                    {currentEnvMode === 'remote' && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                        当前
-                      </span>
-                    )}
-                  </div>
-                  {envActiveProviders.remote && providers.find(p => p.id === envActiveProviders.remote) ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Check className="w-4 h-4 flex-shrink-0 text-blue-400" />
-                        <span className="text-sm text-white truncate">{providers.find(p => p.id === envActiveProviders.remote)?.name}</span>
-                      </div>
-                      {onApplyConfig && currentEnvMode === 'remote' && (
-                        <button
-                          onClick={() => onApplyConfig(envActiveProviders.remote!)}
-                          className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
-                          title="一键应用配置"
-                        >
-                          <Zap className="w-3 h-3" />
-                          应用
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-500">未设置</div>
-                  )}
-                </div>
               </div>
+
+              {/* 远程环境激活的供应商 */}
+              {remoteEnvironments.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {remoteEnvironments.map((remote) => {
+                    const remoteMode = getRemoteEnvMode(remote.id)
+                    const isCurrentMode = currentEnvMode === remoteMode
+                    const activeProviderId = envActiveProviders[remoteMode as keyof EnvironmentActiveProviders]
+                    const activeProvider = activeProviderId ? providers.find(p => p.id === activeProviderId) : null
+                    
+                    return (
+                      <div 
+                        key={remote.id}
+                        className={`p-3 rounded-lg border ${
+                          isCurrentMode
+                            ? 'border-blue-500/50 bg-blue-500/5' 
+                            : 'border-[#3d3d5c] bg-[#1a1a2e]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Server className="w-3 h-3 text-blue-400" />
+                            <span className={`text-xs font-medium ${
+                              isCurrentMode ? 'text-blue-400' : 'text-gray-500'
+                            }`}>
+                              {remote.name}
+                            </span>
+                          </div>
+                          {isCurrentMode && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                              当前
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 mb-2 truncate" title={`${remote.username}@${remote.host}:${remote.port}`}>
+                          {remote.username}@{remote.host}
+                        </div>
+                        {activeProvider ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Check className="w-4 h-4 flex-shrink-0 text-blue-400" />
+                              <span className="text-sm text-white truncate">{activeProvider.name}</span>
+                            </div>
+                            {onApplyConfig && isCurrentMode && (
+                              <button
+                                onClick={() => onApplyConfig(activeProvider.id)}
+                                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                                title="一键应用配置"
+                              >
+                                <Zap className="w-3 h-3" />
+                                应用
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500">未设置供应商</div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               
               <p className="text-xs text-gray-500 mt-3">
                 💡 提示：点击下方供应商卡片的 "设为激活" 按钮，将其设为当前环境模式的激活供应商
@@ -549,7 +641,7 @@ export default function ProviderList({
                 </div>
 
                 {/* 环境模式标签 */}
-                <div className="flex items-center gap-2 mt-3">
+                <div className="flex items-center flex-wrap gap-2 mt-3">
                   <span className="text-xs text-gray-500">环境模式:</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${
                     provider.environmentMode === 'local' 
@@ -558,30 +650,50 @@ export default function ProviderList({
                         ? 'bg-orange-500/20 text-orange-400'
                         : 'bg-blue-500/20 text-blue-400'
                   }`}>
-                    {provider.environmentMode === 'local' ? '本地' : provider.environmentMode === 'wsl' ? 'WSL' : 'Remote'}
+                    {getEnvModeLabel(provider.environmentMode)}
                   </span>
                   {/* 显示该供应商是哪些环境的激活配置 */}
-                  {(envActiveProviders.local === provider.id || 
-                    envActiveProviders.wsl === provider.id || 
-                    envActiveProviders.remote === provider.id) && (
-                    <div className="flex items-center gap-1 ml-2">
-                      <span className="text-xs text-gray-500">已激活于:</span>
-                      {envActiveProviders.local === provider.id && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/30">本地</span>
-                      )}
-                      {envActiveProviders.wsl === provider.id && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/30">WSL</span>
-                      )}
-                      {envActiveProviders.remote === provider.id && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">Remote</span>
-                      )}
-                    </div>
-                  )}
+                  {(() => {
+                    const activatedEnvs: { mode: EnvironmentMode; label: string; color: string }[] = []
+                    if (envActiveProviders.local === provider.id) {
+                      activatedEnvs.push({ mode: 'local', label: '本地', color: 'green' })
+                    }
+                    if (envActiveProviders.wsl === provider.id) {
+                      activatedEnvs.push({ mode: 'wsl', label: 'WSL', color: 'orange' })
+                    }
+                    // 检查远程环境
+                    remoteEnvironments.forEach(remote => {
+                      const remoteMode = getRemoteEnvMode(remote.id)
+                      if (envActiveProviders[remoteMode as keyof EnvironmentActiveProviders] === provider.id) {
+                        activatedEnvs.push({ mode: remoteMode, label: remote.name, color: 'blue' })
+                      }
+                    })
+                    
+                    if (activatedEnvs.length === 0) return null
+                    
+                    return (
+                      <div className="flex items-center flex-wrap gap-1 ml-2">
+                        <span className="text-xs text-gray-500">已激活于:</span>
+                        {activatedEnvs.map(env => (
+                          <span 
+                            key={env.mode}
+                            className={`text-xs px-1.5 py-0.5 rounded border ${
+                              env.color === 'green' ? 'bg-green-500/10 text-green-400 border-green-500/30' :
+                              env.color === 'orange' ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' :
+                              'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                            }`}
+                          >
+                            {env.label}
+                          </span>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#3d3d5c]">
                   {/* 设为当前环境模式的激活配置 */}
-                  {envActiveProviders[currentEnvMode] !== provider.id && onEnvActivate && (
+                  {envActiveProviders[currentEnvMode as keyof EnvironmentActiveProviders] !== provider.id && onEnvActivate && (
                     <button
                       onClick={() => onEnvActivate(provider.id, currentEnvMode)}
                       className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-colors ${
@@ -593,11 +705,11 @@ export default function ProviderList({
                       }`}
                     >
                       <Check className="w-4 h-4" />
-                      设为{currentEnvMode === 'local' ? '本地' : currentEnvMode === 'wsl' ? 'WSL' : 'Remote'}激活
+                      设为{getEnvModeLabel(currentEnvMode)}激活
                     </button>
                   )}
                   {/* 一键应用配置 */}
-                  {envActiveProviders[currentEnvMode] === provider.id && onApplyConfig && (
+                  {envActiveProviders[currentEnvMode as keyof EnvironmentActiveProviders] === provider.id && onApplyConfig && (
                     <button
                       onClick={() => onApplyConfig(provider.id)}
                       className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded transition-colors"

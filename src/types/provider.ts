@@ -1,14 +1,27 @@
 // 供应商类型
 export type ProviderType = 'claude' | 'codex' | 'gemini'
 
-// 环境模式
-export type EnvironmentMode = 'local' | 'wsl' | 'remote'
+// 环境模式 - local/wsl 是固定的，remote:xxx 是动态的远程环境
+export type EnvironmentMode = 'local' | 'wsl' | `remote:${string}`
+
+// 远程环境配置（用于管理多个远程服务器）
+export interface RemoteEnvironment {
+  id: string
+  name: string           // 显示名称，如 "生产服务器"、"测试服务器"
+  host: string
+  port: number
+  username: string
+  sshKeyPath: string
+  workingDirectory?: string
+  createdAt: number
+}
 
 // 按环境模式存储的激活供应商配置
 export interface EnvironmentActiveProviders {
-  local: string | null    // 本地环境激活的供应商 ID
-  wsl: string | null      // WSL 环境激活的供应商 ID  
-  remote: string | null   // 远程环境激活的供应商 ID
+  local: string | null      // 本地环境激活的供应商 ID
+  wsl: string | null        // WSL 环境激活的供应商 ID  
+  // 远程环境使用动态键，格式为 "remote:环境ID"
+  [key: `remote:${string}`]: string | null
 }
 
 // 认证模式

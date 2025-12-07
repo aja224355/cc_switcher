@@ -1,4 +1,4 @@
-import { Provider, ProviderType, ClaudeProvider, CodexProvider, GeminiProvider, EnvironmentMode, EnvironmentActiveProviders } from '@/types/provider'
+import { Provider, ProviderType, ClaudeProvider, CodexProvider, GeminiProvider, EnvironmentMode, EnvironmentActiveProviders, RemoteEnvironment } from '@/types/provider'
 import { v4 as uuidv4 } from 'uuid'
 
 // 存储键
@@ -22,6 +22,9 @@ const ENV_ACTIVE_PROVIDER_KEYS = {
 
 // 当前活跃环境模式
 const CURRENT_ENV_MODE_KEY = 'current-environment-mode'
+
+// 远程环境列表存储键
+const REMOTE_ENVIRONMENTS_KEY = 'remote-environments'
 
 // cc-switch SQL 格式的配置接口
 export interface CCSwitchConfig {
@@ -160,6 +163,77 @@ export function setActiveProviderId(id: string | null): void {
 }
 
 // ============================================
+// 远程环境管理
+// ============================================
+
+// 获取所有远程环境
+export function getRemoteEnvironments(): RemoteEnvironment[] {
+  try {
+    const data = localStorage.getItem(REMOTE_ENVIRONMENTS_KEY)
+    return data ? JSON.parse(data) : []
+  } catch {
+    return []
+  }
+}
+
+// 保存所有远程环境
+export function saveRemoteEnvironments(envs: RemoteEnvironment[]): void {
+  localStorage.setItem(REMOTE_ENVIRONMENTS_KEY, JSON.stringify(envs))
+}
+
+// 添加远程环境
+export function addRemoteEnvironment(env: Omit<RemoteEnvironment, 'id' | 'createdAt'>): RemoteEnvironment {
+  const envs = getRemoteEnvironments()
+  const newEnv: RemoteEnvironment = {
+    ...env,
+    id: uuidv4(),
+    createdAt: Date.now(),
+  }
+  envs.push(newEnv)
+  saveRemoteEnvironments(envs)
+  return newEnv
+}
+
+// 更新远程环境
+export function updateRemoteEnvironment(id: string, updates: Partial<Omit<RemoteEnvironment, 'id' | 'createdAt'>>): RemoteEnvironment | null {
+  const envs = getRemoteEnvironments()
+  const index = envs.findIndex(e => e.id === id)
+  if (index === -1) return null
+  
+  envs[index] = { ...envs[index], ...updates }
+  saveRemoteEnvironments(envs)
+  return envs[index]
+}
+
+// 删除远程环境
+export function deleteRemoteEnvironment(id: string): boolean {
+  const envs = getRemoteEnvironments()
+  const filtered = envs.filter(e => e.id !== id)
+  if (filtered.length === envs.length) return false
+  
+  saveRemoteEnvironments(filtered)
+  return true
+}
+
+// 获取远程环境的环境模式字符串
+export function getRemoteEnvMode(remoteId: string): EnvironmentMode {
+  return `remote:${remoteId}` as EnvironmentMode
+}
+
+// 从环境模式字符串解析远程环境 ID
+export function parseRemoteEnvMode(mode: EnvironmentMode): string | null {
+  if (mode.startsWith('remote:')) {
+    return mode.substring(7)
+  }
+  return null
+}
+
+// 判断是否是远程环境模式
+export function isRemoteEnvMode(mode: EnvironmentMode): boolean {
+  return mode.startsWith('remote:')
+}
+
+// ============================================
 // 按环境模式管理激活的供应商
 // ============================================
 
@@ -184,7 +258,7 @@ export function getEnvActiveProviders(type: ProviderType): EnvironmentActiveProv
   } catch {
     // ignore
   }
-  return { local: null, wsl: null, remote: null }
+  return { local: null, wsl: null }
 }
 
 // 设置某个环境模式下激活的供应商
@@ -216,7 +290,12 @@ export function getCurrentEnvActiveProvider<T extends Provider>(type: ProviderTy
 }
 
 // 一键应用配置到当前环境
-export function applyProviderToCurrentEnv(type: ProviderType, providerId: string): { success: boolean; message: string; script?: string } {
+export function applyProviderToCurrentEnv(
+  type: ProviderType, 
+  providerId: string, 
+  currentEnvMode?: EnvironmentMode,
+  remoteEnvironments?: RemoteEnvironment[]
+): { success: boolean; message: string; script?: string } {
   const providers = getProvidersByType<ClaudeProvider | CodexProvider | GeminiProvider>(type)
   const provider = providers.find(p => p.id === providerId)
   
@@ -224,7 +303,8 @@ export function applyProviderToCurrentEnv(type: ProviderType, providerId: string
     return { success: false, message: '未找到供应商配置' }
   }
   
-  const envMode = provider.environmentMode
+  // 使用传入的环境模式，否则使用当前环境模式
+  const envMode = currentEnvMode || getCurrentEnvironmentMode()
   
   // 设置为该环境模式下的激活供应商
   setEnvActiveProvider(type, envMode, providerId)
@@ -241,10 +321,20 @@ export function applyProviderToCurrentEnv(type: ProviderType, providerId: string
     // WSL 模式：生成 WSL 环境设置命令
     script = generateWslApplyScript(provider)
     message = `已将 "${provider.name}" 设为 WSL 环境的激活供应商。\n\n请运行导出的脚本在 WSL 中应用配置。`
-  } else if (envMode === 'remote') {
+  } else if (isRemoteEnvMode(envMode)) {
     // 远程模式：生成远程部署脚本
-    script = generateRemoteDeployScript(provider)
-    message = `已将 "${provider.name}" 设为远程环境的激活供应商。\n\n请运行导出的脚本部署配置到远程服务器。`
+    const remoteId = parseRemoteEnvMode(envMode)
+    const remote = remoteEnvironments?.find(r => r.id === remoteId)
+    
+    if (remote) {
+      // 使用远程环境的配置生成部署脚本
+      script = generateRemoteDeployScriptForEnv(provider, remote)
+      message = `已将 "${provider.name}" 设为远程环境 "${remote.name}" 的激活供应商。\n\n请运行导出的脚本部署配置到 ${remote.host}。`
+    } else {
+      // 如果供应商配置了自己的 SSH 信息
+      script = generateRemoteDeployScript(provider)
+      message = `已将 "${provider.name}" 设为远程环境的激活供应商。\n\n请运行导出的脚本部署配置到远程服务器。`
+    }
   }
   
   return { success: true, message, script }
@@ -830,6 +920,126 @@ export function generateRemoteDeployScript(provider: ClaudeProvider | CodexProvi
   lines.push('echo -e "${YELLOW}现在可以连接到远程服务器运行:${NC}"')
   if (activeRemote.workingDirectory) {
     lines.push(`echo "  ssh ${sshKey} ${port} ${sshTarget} -t 'cd ${activeRemote.workingDirectory} && ${provider.type}'"`)
+  } else {
+    lines.push(`echo "  ssh ${sshKey} ${port} ${sshTarget} -t '${provider.type}'"`)
+  }
+  
+  return lines.join('\n')
+}
+
+// 使用独立远程环境配置生成部署脚本
+export function generateRemoteDeployScriptForEnv(
+  provider: ClaudeProvider | CodexProvider | GeminiProvider,
+  remote: RemoteEnvironment
+): string {
+  const sshKey = remote.sshKeyPath ? `-i ${remote.sshKeyPath}` : ''
+  const port = remote.port !== 22 ? `-p ${remote.port}` : ''
+  const sshTarget = `${remote.username}@${remote.host}`
+  
+  const lines: string[] = [
+    '#!/bin/bash',
+    '# ============================================',
+    '# 远程服务器配置部署脚本',
+    `# 目标服务器: ${remote.name} (${remote.host})`,
+    '# Generated by cc_switcher',
+    '# ============================================',
+    '',
+    '# 颜色定义',
+    'RED="\\033[0;31m"',
+    'GREEN="\\033[0;32m"',
+    'YELLOW="\\033[1;33m"',
+    'NC="\\033[0m" # No Color',
+    '',
+    'echo -e "${GREEN}开始部署配置到远程服务器 ' + remote.name + '...${NC}"',
+    '',
+    '# 1. 测试 SSH 连接',
+    'echo -e "${YELLOW}[1/4] 测试 SSH 连接...${NC}"',
+    `if ! ssh ${sshKey} ${port} -o ConnectTimeout=10 ${sshTarget} "echo 'SSH 连接成功'"; then`,
+    '  echo -e "${RED}SSH 连接失败，请检查网络和 SSH 配置${NC}"',
+    '  exit 1',
+    'fi',
+    '',
+    '# 2. 创建远程配置目录',
+    'echo -e "${YELLOW}[2/4] 创建远程配置目录...${NC}"',
+  ]
+  
+  if (provider.type === 'claude') {
+    const claudeProvider = provider as ClaudeProvider
+    const settingsJson = {
+      env: {
+        ANTHROPIC_BASE_URL: claudeProvider.requestUrl || 'https://api.anthropic.com',
+        ANTHROPIC_AUTH_TOKEN: claudeProvider.apiKey,
+        ANTHROPIC_MODEL: claudeProvider.mainModel,
+        ...(claudeProvider.haikuModel && { ANTHROPIC_DEFAULT_HAIKU_MODEL: claudeProvider.haikuModel }),
+        ...(claudeProvider.sonnetModel && { ANTHROPIC_DEFAULT_SONNET_MODEL: claudeProvider.sonnetModel }),
+        ...(claudeProvider.opusModel && { ANTHROPIC_DEFAULT_OPUS_MODEL: claudeProvider.opusModel }),
+      }
+    }
+    
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "mkdir -p ~/.claude"`)
+    lines.push('')
+    lines.push('# 3. 写入配置文件')
+    lines.push('echo -e "${YELLOW}[3/4] 写入 Claude 配置文件...${NC}"')
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "cat > ~/.claude/settings.json << 'EOF'`)
+    lines.push(JSON.stringify(settingsJson, null, 2))
+    lines.push('EOF"')
+    lines.push('')
+    lines.push('# 4. 验证配置')
+    lines.push('echo -e "${YELLOW}[4/4] 验证配置文件...${NC}"')
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "cat ~/.claude/settings.json | head -5"`)
+  } else if (provider.type === 'codex') {
+    const codexProvider = provider as CodexProvider
+    const configToml = [
+      `model = "${codexProvider.model || 'gpt-5-codex'}"`,
+      `model_provider = "${codexProvider.modelProvider || 'openai'}"`,
+      `approval_policy = "${codexProvider.approvalPolicy || 'on-request'}"`,
+      `sandbox_mode = "${codexProvider.sandboxMode || 'workspace-write'}"`,
+      '',
+      '[model_providers.openai]',
+      'name = "OpenAI"',
+      `base_url = "${codexProvider.requestUrl || 'https://api.openai.com/v1'}"`,
+      'env_key = "OPENAI_API_KEY"',
+      'wire_api = "responses"'
+    ].join('\n')
+    
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "mkdir -p ~/.codex"`)
+    lines.push('')
+    lines.push('# 3. 写入配置文件')
+    lines.push('echo -e "${YELLOW}[3/4] 写入 Codex 配置文件...${NC}"')
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "cat > ~/.codex/config.toml << 'EOF'`)
+    lines.push(configToml)
+    lines.push('EOF"')
+    lines.push('')
+    lines.push('# 设置环境变量 (添加到 ~/.bashrc)')
+    lines.push('echo -e "${YELLOW}设置 OPENAI_API_KEY 环境变量...${NC}"')
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "grep -q 'OPENAI_API_KEY' ~/.bashrc || echo 'export OPENAI_API_KEY=\\"${codexProvider.apiKey}\\"' >> ~/.bashrc"`)
+    lines.push('')
+    lines.push('# 4. 验证配置')
+    lines.push('echo -e "${YELLOW}[4/4] 验证配置文件...${NC}"')
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "cat ~/.codex/config.toml | head -5"`)
+  } else {
+    // Gemini
+    const geminiProvider = provider as GeminiProvider
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "mkdir -p ~/.gemini"`)
+    lines.push('')
+    lines.push('# 3. 设置环境变量')
+    lines.push('echo -e "${YELLOW}[3/4] 设置 Gemini 环境变量...${NC}"')
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "grep -q 'GOOGLE_API_KEY' ~/.bashrc || echo 'export GOOGLE_API_KEY=\\"${geminiProvider.apiKey}\\"' >> ~/.bashrc"`)
+    if (geminiProvider.requestUrl) {
+      lines.push(`ssh ${sshKey} ${port} ${sshTarget} "grep -q 'GOOGLE_API_BASE_URL' ~/.bashrc || echo 'export GOOGLE_API_BASE_URL=\\"${geminiProvider.requestUrl}\\"' >> ~/.bashrc"`)
+    }
+    lines.push('')
+    lines.push('# 4. 验证配置')
+    lines.push('echo -e "${YELLOW}[4/4] 验证环境变量...${NC}"')
+    lines.push(`ssh ${sshKey} ${port} ${sshTarget} "source ~/.bashrc && echo GOOGLE_API_KEY is set: \\$GOOGLE_API_KEY | cut -c1-30"`)
+  }
+  
+  lines.push('')
+  lines.push('echo -e "${GREEN}✅ 配置部署完成！${NC}"')
+  lines.push('echo ""')
+  lines.push('echo -e "${YELLOW}现在可以连接到远程服务器运行:${NC}"')
+  if (remote.workingDirectory) {
+    lines.push(`echo "  ssh ${sshKey} ${port} ${sshTarget} -t 'cd ${remote.workingDirectory} && ${provider.type}'"`)
   } else {
     lines.push(`echo "  ssh ${sshKey} ${port} ${sshTarget} -t '${provider.type}'"`)
   }
