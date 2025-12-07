@@ -30,6 +30,7 @@ import {
   generateConnectionCommand,
   generateRemoteDeployScript,
   generateWslApplyScript,
+  generateWslScript,
   importProviders,
   getCurrentEnvironmentMode,
   setCurrentEnvironmentMode,
@@ -342,10 +343,13 @@ function ConfigManager() {
           alert('请先选择一个供应商')
           return
         }
-        data = generateWslApplyScript(activeProvider)
-        mimeType = 'text/plain'
-        extension = 'sh'
-        filename = `apply-${activeTab}-to-wsl`
+        {
+          const wslResult = generateWslScript(activeProvider)
+          data = wslResult.script
+          mimeType = 'text/plain'
+          extension = wslResult.type === 'powershell' ? 'ps1' : 'sh'
+          filename = wslResult.filename.replace(/\.(ps1|sh)$/, '')
+        }
         break
       default:
         data = exportProvidersJSON()

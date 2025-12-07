@@ -40,6 +40,21 @@ export interface SSHRemote {
   workingDirectory?: string
 }
 
+// WSL 应用方式
+export type WslApplyMode = 'bash' | 'windows'  // bash: 在WSL内执行脚本, windows: 从Windows直接写入
+
+// WSL 路径配置
+export interface WslPathConfig {
+  applyMode: WslApplyMode           // 应用方式
+  distroName: string                // WSL 发行版名称，如 "Ubuntu"、"Debian"
+  wslUsername?: string              // WSL 用户名，用于计算 home 目录路径
+  claudeConfigPath: string          // Linux 路径，默认 ~/.claude
+  codexConfigPath: string           // Linux 路径，默认 ~/.codex
+  bashrcPath: string                // Linux 路径，默认 ~/.bashrc
+  // Windows UNC 路径前缀（自动计算或手动指定）
+  windowsBasePath?: string          // 如 \\wsl$\Ubuntu 或 \\wsl.localhost\Ubuntu
+}
+
 // 基础供应商接口
 export interface BaseProvider {
   id: string
@@ -58,6 +73,8 @@ export interface BaseProvider {
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
   activeRemoteId: string | null
+  // WSL 路径配置
+  wslPaths?: WslPathConfig
 }
 
 // Claude Code 权限配置
