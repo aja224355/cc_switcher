@@ -243,6 +243,7 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
           configJson: {},
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          authMode: 'apikey',
           environmentMode: 'local',
           sshRemotes: [],
           activeRemoteId: null
@@ -341,6 +342,7 @@ export function importProvidersJSON(json: string): { success: boolean; count: nu
           configJson: {},
           createdAt: item.createdAt || Date.now(),
           updatedAt: item.updatedAt || Date.now(),
+          authMode: item.authMode || 'apikey',
           environmentMode: item.environmentMode || 'local',
           sshRemotes: item.sshRemotes || [],
           activeRemoteId: item.activeRemoteId || null

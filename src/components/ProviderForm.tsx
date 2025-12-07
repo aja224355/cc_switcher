@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Lightbulb, Zap, ExternalLink, Plus, Trash2, Monitor, Server, Key } from 'lucide-react'
-import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, SSHRemote, EnvironmentMode } from '@/types/provider'
+import { ArrowLeft, Lightbulb, Zap, ExternalLink, Plus, Trash2, Monitor, Server, Key, CreditCard, KeyRound } from 'lucide-react'
+import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType, SSHRemote, EnvironmentMode, AuthMode } from '@/types/provider'
 import { generateConfigJson, generateCodexConfigJson, generateGeminiConfigJson } from '@/utils/storage'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -24,6 +24,7 @@ interface ClaudeFormData {
   haikuModel: string
   sonnetModel: string
   opusModel: string
+  authMode: AuthMode
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
   activeRemoteId: string | null
@@ -38,6 +39,7 @@ interface CodexFormData {
   requestUrl: string
   model: string
   authJson: string
+  authMode: AuthMode
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
   activeRemoteId: string | null
@@ -51,6 +53,7 @@ interface GeminiFormData {
   apiKey: string
   requestUrl: string
   model: string
+  authMode: AuthMode
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
   activeRemoteId: string | null
@@ -66,6 +69,7 @@ const initialClaudeFormData: ClaudeFormData = {
   haikuModel: '',
   sonnetModel: '',
   opusModel: '',
+  authMode: 'apikey',
   environmentMode: 'local',
   sshRemotes: [],
   activeRemoteId: null,
@@ -79,6 +83,7 @@ const initialCodexFormData: CodexFormData = {
   requestUrl: '',
   model: '',
   authJson: '',
+  authMode: 'apikey',
   environmentMode: 'local',
   sshRemotes: [],
   activeRemoteId: null,
@@ -91,6 +96,7 @@ const initialGeminiFormData: GeminiFormData = {
   apiKey: '',
   requestUrl: '',
   model: '',
+  authMode: 'apikey',
   environmentMode: 'local',
   sshRemotes: [],
   activeRemoteId: null,
@@ -116,6 +122,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
           haikuModel: p.haikuModel,
           sonnetModel: p.sonnetModel,
           opusModel: p.opusModel,
+          authMode: p.authMode || 'apikey',
           environmentMode: p.environmentMode || 'local',
           sshRemotes: p.sshRemotes || [],
           activeRemoteId: p.activeRemoteId || null,
@@ -130,6 +137,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
           requestUrl: p.requestUrl,
           model: p.model,
           authJson: JSON.stringify(p.authJson || {}, null, 2),
+          authMode: p.authMode || 'apikey',
           environmentMode: p.environmentMode || 'local',
           sshRemotes: p.sshRemotes || [],
           activeRemoteId: p.activeRemoteId || null,
@@ -143,6 +151,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
           apiKey: p.apiKey,
           requestUrl: p.requestUrl,
           model: p.model,
+          authMode: p.authMode || 'apikey',
           environmentMode: p.environmentMode || 'local',
           sshRemotes: p.sshRemotes || [],
           activeRemoteId: p.activeRemoteId || null,
@@ -151,15 +160,15 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
     }
   }, [provider])
 
-  const handleClaudeChange = (field: keyof ClaudeFormData, value: string | EnvironmentMode | SSHRemote[] | null) => {
+  const handleClaudeChange = (field: keyof ClaudeFormData, value: string | EnvironmentMode | AuthMode | SSHRemote[] | null) => {
     setClaudeFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleCodexChange = (field: keyof CodexFormData, value: string | EnvironmentMode | SSHRemote[] | null) => {
+  const handleCodexChange = (field: keyof CodexFormData, value: string | EnvironmentMode | AuthMode | SSHRemote[] | null) => {
     setCodexFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleGeminiChange = (field: keyof GeminiFormData, value: string | EnvironmentMode | SSHRemote[] | null) => {
+  const handleGeminiChange = (field: keyof GeminiFormData, value: string | EnvironmentMode | AuthMode | SSHRemote[] | null) => {
     setGeminiFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -231,10 +240,11 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
         haikuModel: claudeFormData.haikuModel,
         sonnetModel: claudeFormData.sonnetModel,
         opusModel: claudeFormData.opusModel,
+        authMode: claudeFormData.authMode,
         environmentMode: claudeFormData.environmentMode,
         sshRemotes: claudeFormData.sshRemotes,
         activeRemoteId: claudeFormData.activeRemoteId,
-        configJson: generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0, environmentMode: claudeFormData.environmentMode, sshRemotes: claudeFormData.sshRemotes, activeRemoteId: claudeFormData.activeRemoteId } as ClaudeProvider),
+        configJson: generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0, authMode: claudeFormData.authMode, environmentMode: claudeFormData.environmentMode, sshRemotes: claudeFormData.sshRemotes, activeRemoteId: claudeFormData.activeRemoteId } as ClaudeProvider),
         createdAt: provider?.createdAt || now,
         updatedAt: now,
       }
@@ -256,6 +266,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
         requestUrl: codexFormData.requestUrl,
         model: codexFormData.model,
         authJson,
+        authMode: codexFormData.authMode,
         environmentMode: codexFormData.environmentMode,
         sshRemotes: codexFormData.sshRemotes,
         activeRemoteId: codexFormData.activeRemoteId,
@@ -274,6 +285,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
         apiKey: geminiFormData.apiKey,
         requestUrl: geminiFormData.requestUrl,
         model: geminiFormData.model,
+        authMode: geminiFormData.authMode,
         environmentMode: geminiFormData.environmentMode,
         sshRemotes: geminiFormData.sshRemotes,
         activeRemoteId: geminiFormData.activeRemoteId,
@@ -287,7 +299,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
 
   const getConfigJson = () => {
     if (providerType === 'claude') {
-      return generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0, environmentMode: claudeFormData.environmentMode, sshRemotes: claudeFormData.sshRemotes, activeRemoteId: claudeFormData.activeRemoteId } as ClaudeProvider)
+      return generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0, authMode: claudeFormData.authMode, environmentMode: claudeFormData.environmentMode, sshRemotes: claudeFormData.sshRemotes, activeRemoteId: claudeFormData.activeRemoteId } as ClaudeProvider)
     } else if (providerType === 'codex') {
       let authJson = {}
       try {
@@ -532,6 +544,55 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
               </p>
             </>
           )}
+
+          {/* Authentication Mode Selection */}
+          <div className="border-t border-[#3d3d5c] pt-6">
+            <label className="input-label mb-3">认证方式</label>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const handler = getCurrentHandler()
+                  handler('authMode' as any, 'plan')
+                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  getCurrentFormData().authMode === 'plan'
+                    ? 'border-[#f59e0b] bg-[#f59e0b]/10 text-white'
+                    : 'border-[#3d3d5c] bg-[#2d2d44] text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                <CreditCard className="w-5 h-5" />
+                <div className="text-left">
+                  <div className="font-medium">官方 Plan 订阅</div>
+                  <div className="text-xs opacity-70">使用官方订阅账号</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const handler = getCurrentHandler()
+                  handler('authMode' as any, 'apikey')
+                }}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-all ${
+                  getCurrentFormData().authMode === 'apikey'
+                    ? 'border-[#8b5cf6] bg-[#8b5cf6]/10 text-white'
+                    : 'border-[#3d3d5c] bg-[#2d2d44] text-gray-400 hover:border-gray-500'
+                }`}
+              >
+                <KeyRound className="w-5 h-5" />
+                <div className="text-left">
+                  <div className="font-medium">API Key</div>
+                  <div className="text-xs opacity-70">使用 API 密钥认证</div>
+                </div>
+              </button>
+            </div>
+            {getCurrentFormData().authMode === 'plan' && (
+              <div className="warning-box mt-3">
+                <Lightbulb className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <span>使用官方 Plan 订阅时，无需填写 API Key，系统将使用您的订阅账号进行认证</span>
+              </div>
+            )}
+          </div>
 
           {/* Environment Mode Selection */}
           <div className="border-t border-[#3d3d5c] pt-6">

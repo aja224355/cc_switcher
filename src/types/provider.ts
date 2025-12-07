@@ -4,6 +4,9 @@ export type ProviderType = 'claude' | 'codex' | 'gemini'
 // 环境模式
 export type EnvironmentMode = 'local' | 'remote'
 
+// 认证模式
+export type AuthMode = 'plan' | 'apikey'
+
 // SSH Remote 配置
 export interface SSHRemote {
   id: string
@@ -27,6 +30,8 @@ export interface BaseProvider {
   configJson: Record<string, unknown>
   createdAt: number
   updatedAt: number
+  // 认证模式
+  authMode: AuthMode
   // 环境配置
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
@@ -78,6 +83,7 @@ export interface ClaudeFormData {
   haikuModel: string
   sonnetModel: string
   opusModel: string
+  authMode: AuthMode
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
   activeRemoteId: string | null
@@ -91,6 +97,7 @@ export interface CodexFormData {
   requestUrl: string
   model: string
   authJson: string
+  authMode: AuthMode
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
   activeRemoteId: string | null
@@ -103,6 +110,7 @@ export interface GeminiFormData {
   apiKey: string
   requestUrl: string
   model: string
+  authMode: AuthMode
   environmentMode: EnvironmentMode
   sshRemotes: SSHRemote[]
   activeRemoteId: string | null
