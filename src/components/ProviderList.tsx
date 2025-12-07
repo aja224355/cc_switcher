@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Check, Copy, Download, Upload, Settings, ExternalLink, FileJson, Database } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, Copy, Download, Upload, Settings, ExternalLink, FileJson, Database, FileCode, Terminal } from 'lucide-react'
 import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType } from '@/types/provider'
 
 type Provider = ClaudeProvider | CodexProvider | GeminiProvider
+type ExportFormat = 'json' | 'sql' | 'sql-all' | 'claude-settings' | 'codex-toml' | 'shell-env'
 
 interface TabConfig {
   type: ProviderType
@@ -23,7 +24,7 @@ interface ProviderListProps {
   onExport: () => void
   onImport: () => void
   showExportMenu?: boolean
-  onExportFormat?: (format: 'json' | 'sql') => void
+  onExportFormat?: (format: ExportFormat) => void
   onCloseExportMenu?: () => void
 }
 
@@ -107,10 +108,11 @@ export default function ProviderList({
                 导出
               </button>
               {showExportMenu && onExportFormat && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-[#2d2d44] border border-[#3d3d5c] rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-56 bg-[#2d2d44] border border-[#3d3d5c] rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="px-3 py-2 text-xs text-gray-500 border-b border-[#3d3d5c]">通用格式</div>
                   <button
                     onClick={() => onExportFormat('json')}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
                   >
                     <FileJson className="w-4 h-4 text-[#4da6ff]" />
                     <div>
@@ -120,12 +122,58 @@ export default function ProviderList({
                   </button>
                   <button
                     onClick={() => onExportFormat('sql')}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#3d3d5c] transition-colors text-left border-t border-[#3d3d5c]"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
                   >
                     <Database className="w-4 h-4 text-[#e94560]" />
                     <div>
-                      <div className="font-medium">SQL 格式</div>
+                      <div className="font-medium">SQL 格式 (当前类型)</div>
                       <div className="text-xs text-gray-500">兼容 cc-switch</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => onExportFormat('sql-all')}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
+                  >
+                    <Database className="w-4 h-4 text-[#10b981]" />
+                    <div>
+                      <div className="font-medium">SQL 格式 (全部类型)</div>
+                      <div className="text-xs text-gray-500">包含所有供应商</div>
+                    </div>
+                  </button>
+                  
+                  <div className="px-3 py-2 text-xs text-gray-500 border-t border-b border-[#3d3d5c]">官方格式 (当前激活)</div>
+                  {providerType === 'claude' && (
+                    <button
+                      onClick={() => onExportFormat('claude-settings')}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
+                    >
+                      <FileCode className="w-4 h-4 text-[#e94560]" />
+                      <div>
+                        <div className="font-medium">settings.json</div>
+                        <div className="text-xs text-gray-500">Claude Code 官方格式</div>
+                      </div>
+                    </button>
+                  )}
+                  {providerType === 'codex' && (
+                    <button
+                      onClick={() => onExportFormat('codex-toml')}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
+                    >
+                      <FileCode className="w-4 h-4 text-[#10b981]" />
+                      <div>
+                        <div className="font-medium">config.toml</div>
+                        <div className="text-xs text-gray-500">Codex CLI 官方格式</div>
+                      </div>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onExportFormat('shell-env')}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
+                  >
+                    <Terminal className="w-4 h-4 text-[#f59e0b]" />
+                    <div>
+                      <div className="font-medium">Shell 环境变量</div>
+                      <div className="text-xs text-gray-500">Bash/Zsh export 格式</div>
                     </div>
                   </button>
                 </div>
@@ -325,6 +373,25 @@ export default function ProviderList({
                 <p className="text-gray-300 font-medium">SQL 格式</p>
                 <p className="text-gray-500">
                   兼容 <a href="https://github.com/farion1231/cc-switch" target="_blank" rel="noopener noreferrer" className="text-[#e94560] hover:underline">cc-switch</a> 项目的数据库格式
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <FileCode className="w-5 h-5 text-[#10b981] mt-0.5" />
+              <div>
+                <p className="text-gray-300 font-medium">官方格式</p>
+                <p className="text-gray-500">
+                  Claude: <code className="text-xs bg-[#2d2d44] px-1 rounded">~/.claude/settings.json</code><br />
+                  Codex: <code className="text-xs bg-[#2d2d44] px-1 rounded">~/.codex/config.toml</code>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Terminal className="w-5 h-5 text-[#f59e0b] mt-0.5" />
+              <div>
+                <p className="text-gray-300 font-medium">Shell 环境变量</p>
+                <p className="text-gray-500">
+                  导出为 <code className="text-xs bg-[#2d2d44] px-1 rounded">export VAR=value</code> 格式
                 </p>
               </div>
             </div>

@@ -23,11 +23,15 @@ import {
   deleteGeminiProvider,
   exportProvidersJSON,
   exportProvidersSQL,
+  exportAllProvidersSQL,
+  exportClaudeSettingsJson,
+  exportCodexConfigToml,
+  exportShellEnvVars,
   importProviders,
 } from '@/utils/storage'
 
 type View = 'list' | 'form'
-type ExportFormat = 'json' | 'sql'
+type ExportFormat = 'json' | 'sql' | 'sql-all' | 'claude-settings' | 'codex-toml' | 'shell-env'
 
 // 标签页配置
 const TABS: { type: ProviderType; label: string; color: string }[] = [
@@ -134,16 +138,71 @@ function ConfigManager() {
 
   const handleExport = (format: ExportFormat) => {
     setShowExportMenu(false)
-    const isSQL = format === 'sql'
-    const data = isSQL ? exportProvidersSQL() : exportProvidersJSON()
-    const mimeType = isSQL ? 'application/sql' : 'application/json'
-    const extension = isSQL ? 'sql' : 'json'
+    
+    let data: string
+    let mimeType: string
+    let extension: string
+    let filename: string
+    
+    const currentProviders = getCurrentProviders()
+    const currentActiveId = getActiveProviderIdByType(activeTab)
+    const activeProvider = currentProviders.find(p => p.id === currentActiveId) || currentProviders[0]
+    
+    switch (format) {
+      case 'sql':
+        data = exportProvidersSQL()
+        mimeType = 'application/sql'
+        extension = 'sql'
+        filename = 'claude-code-providers'
+        break
+      case 'sql-all':
+        data = exportAllProvidersSQL()
+        mimeType = 'application/sql'
+        extension = 'sql'
+        filename = 'all-providers'
+        break
+      case 'claude-settings':
+        if (activeTab !== 'claude' || !activeProvider) {
+          alert('请先选择一个 Claude 供应商')
+          return
+        }
+        data = exportClaudeSettingsJson(activeProvider as ClaudeProvider)
+        mimeType = 'application/json'
+        extension = 'json'
+        filename = 'settings'
+        break
+      case 'codex-toml':
+        if (activeTab !== 'codex' || !activeProvider) {
+          alert('请先选择一个 Codex 供应商')
+          return
+        }
+        data = exportCodexConfigToml(activeProvider as CodexProvider)
+        mimeType = 'text/plain'
+        extension = 'toml'
+        filename = 'config'
+        break
+      case 'shell-env':
+        if (!activeProvider) {
+          alert('请先选择一个供应商')
+          return
+        }
+        data = exportShellEnvVars(activeProvider)
+        mimeType = 'text/plain'
+        extension = 'sh'
+        filename = `${activeTab}-env`
+        break
+      default:
+        data = exportProvidersJSON()
+        mimeType = 'application/json'
+        extension = 'json'
+        filename = 'claude-code-providers'
+    }
     
     const blob = new Blob([data], { type: mimeType })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `claude-code-providers.${extension}`
+    a.download = `${filename}.${extension}`
     a.click()
     URL.revokeObjectURL(url)
   }

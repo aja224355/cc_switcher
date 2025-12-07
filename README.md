@@ -249,6 +249,56 @@ source ~/.zshrc  # or ~/.bashrc
 }
 ```
 
+## 📋 Configuration Templates
+
+Pre-configured templates for Claude Code, OpenAI Codex, and Google Gemini are available in the `templates/` directory:
+
+- **`templates/providers-template.sql`** - SQL format template with Claude, Codex, and Gemini configurations
+
+### Included Templates
+
+| Provider | API Endpoint | Models |
+|----------|--------------|--------|
+| Claude Official API | `https://api.anthropic.com` | claude-sonnet-4, claude-3-5-haiku, claude-3-opus |
+| Claude Max (Pro) | `https://api.claude.ai` | claude-sonnet-4, claude-3-5-haiku, claude-3-opus |
+| OpenAI Codex | `https://api.openai.com/v1` | gpt-5.1-codex-max, gpt-5-codex |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta` | gemini-2.0-flash |
+| OpenRouter | `https://openrouter.ai/api/v1` | Multiple providers |
+
+### Export Formats
+
+The Web UI supports multiple export formats:
+
+| Format | File | Description |
+|--------|------|-------------|
+| JSON | `providers.json` | Standard configuration format |
+| SQL | `providers.sql` | cc-switch compatible format |
+| Claude settings.json | `~/.claude/settings.json` | Claude Code official format |
+| Codex config.toml | `~/.codex/config.toml` | Codex CLI official format |
+| Shell Environment | `.env.sh` | Bash/Zsh export format |
+
+### Using Templates
+
+```bash
+# Import via Web UI
+1. Open cc_switcher Web UI
+2. Click "导入配置" (Import)
+3. Select templates/providers-template.sql
+4. Edit imported providers to add your API keys
+
+# Or edit SQL directly
+cp templates/providers-template.sql my-config.sql
+# Edit my-config.sql to replace YOUR_API_KEY_HERE with actual keys
+# Then import the modified file
+```
+
+### Official Documentation
+
+- **Claude Code**: https://docs.anthropic.com/
+- **OpenAI Codex**: https://platform.openai.com/docs
+- **Google Gemini**: https://ai.google.dev/docs
+- **OpenRouter**: https://openrouter.ai/docs
+
 ## License
 
 MIT License

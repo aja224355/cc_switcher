@@ -249,6 +249,57 @@ source ~/.zshrc  # 或 ~/.bashrc
 }
 ```
 
+## 📋 配置模板
+
+`templates/` 目录中提供了 Claude Code、OpenAI Codex 和 Google Gemini 的预配置模板：
+
+- **`templates/providers-template.sql`** - SQL 格式模板，包含 Claude、Codex 和 Gemini 配置
+
+### 包含的模板
+
+| 供应商 | API 端点 | 模型 |
+|--------|----------|------|
+| Claude 官方 API | `https://api.anthropic.com` | claude-sonnet-4, claude-3-5-haiku, claude-3-opus |
+| Claude Max (Pro 订阅) | `https://api.claude.ai` | claude-sonnet-4, claude-3-5-haiku, claude-3-opus |
+| OpenAI Codex | `https://api.openai.com/v1` | gpt-5.1-codex-max, gpt-5-codex |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta` | gemini-2.0-flash |
+| OpenRouter | `https://openrouter.ai/api/v1` | 多供应商支持 |
+
+### 导出格式
+
+Web UI 支持多种导出格式：
+
+| 格式 | 文件 | 说明 |
+|------|------|------|
+| JSON | `providers.json` | 标准配置格式 |
+| SQL | `providers.sql` | cc-switch 兼容格式 |
+| Claude settings.json | `~/.claude/settings.json` | Claude Code 官方格式 |
+| Codex config.toml | `~/.codex/config.toml` | Codex CLI 官方格式 |
+| Shell 环境变量 | `.env.sh` | Bash/Zsh export 格式 |
+
+### 使用模板
+
+```bash
+# 通过 Web UI 导入
+1. 打开 cc_switcher Web UI
+2. 点击「导入配置」
+3. 选择 templates/providers-template.sql
+4. 编辑导入的供应商，填入你的 API Key
+
+# 或直接编辑 SQL
+cp templates/providers-template.sql my-config.sql
+# 编辑 my-config.sql，将 YOUR_API_KEY_HERE 替换为实际密钥
+# 然后导入修改后的文件
+```
+
+### 官方文档
+
+- **Claude Code**: https://docs.anthropic.com/
+- **OpenAI Codex**: https://platform.openai.com/docs
+- **Google Gemini**: https://ai.google.dev/docs
+- **OpenRouter**: https://openrouter.ai/docs
+
 ## 许可证
 
 MIT License
+
