@@ -679,7 +679,7 @@ function escapeSql(str: string): string {
   return str.replace(/'/g, "''")
 }
 
-// 从 SQL 格式导入 (支持多类型)
+// 从 SQL 格式导入 (支持多类型和多种表结构)
 export function importProvidersSQL(sql: string): { success: boolean; count: number; error?: string; details?: { claude: number; codex: number; gemini: number } } {
   try {
     const claudeProviders: ClaudeProvider[] = []
@@ -689,11 +689,148 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
     let codexActiveId: string | null = null
     let geminiActiveId: string | null = null
     
-    // 匹配 INSERT 语句
-    const insertRegex = /INSERT INTO providers\s*\([^)]+\)\s*VALUES\s*\(([^;]+)\);/gi
-    let match
+    // 尝试多种 INSERT 语句格式 (支持 cc-switch v3.7.x 和 v3.8.0+ 格式)
+    // 格式1: INSERT INTO providers (columns) VALUES (values);
+    // 格式2: INSERT OR REPLACE INTO providers (columns) VALUES (values);
+    // 格式3: INSERT INTO "providers" (columns) VALUES (values);
+    // 格式4: cc-switch v3.8.0+ 新格式 (id, app, name, api_key, base_url, config_json, ...)
+    const insertPatterns = [
+      /INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+(?:"?providers"?|"?provider"?)\s*\(([^)]+)\)\s*VALUES\s*\(([^;]+)\);?/gi,
+      /INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+(?:"?claude_providers"?)\s*\(([^)]+)\)\s*VALUES\s*\(([^;]+)\);?/gi,
+      /INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+(?:"?codex_providers"?)\s*\(([^)]+)\)\s*VALUES\s*\(([^;]+)\);?/gi,
+      /INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+(?:"?gemini_providers"?)\s*\(([^)]+)\)\s*VALUES\s*\(([^;]+)\);?/gi,
+    ]
     
-    while ((match = insertRegex.exec(sql)) !== null) {
+    // 解析列名到索引的映射
+    const parseColumns = (columnsStr: string): Record<string, number> => {
+      const columns = columnsStr.split(',').map(c => c.trim().replace(/['"]/g, '').toLowerCase())
+      const mapping: Record<string, number> = {}
+      columns.forEach((col, idx) => {
+        mapping[col] = idx
+      })
+      return mapping
+    }
+    
+    // 尝试所有模式
+    for (const pattern of insertPatterns) {
+      let match
+      pattern.lastIndex = 0 // 重置正则状态
+      
+      while ((match = pattern.exec(sql)) !== null) {
+        const columnsStr = match[1]
+        const valuesStr = match[2]
+        const columnMapping = parseColumns(columnsStr)
+        const values = parseInsertValues(valuesStr)
+        
+        // 根据列映射获取值
+        const getValue = (possibleNames: string[]): string => {
+          for (const name of possibleNames) {
+            const idx = columnMapping[name]
+            if (idx !== undefined && values[idx] !== undefined) {
+              return String(values[idx]).replace(/^['"]|['"]$/g, '')
+            }
+          }
+          return ''
+        }
+        
+        const id = uuidv4()
+        // 支持 cc-switch v3.8.0+ 的 'app' 字段名以及旧版 'type' 字段
+        const providerType = getValue(['type', 'provider_type', 'app']).toLowerCase() || 'claude'
+        const name = getValue(['name', 'provider_name', 'title']) || '未命名'
+        // 支持多种 API key 字段名 (包括 cc-switch v3.8.0+ 的 api_key)
+        const apiKey = getValue(['apikey', 'api_key', 'key', 'token', 'auth_token'])
+        // 支持多种 URL 字段名
+        const requestUrl = getValue(['apiurl', 'api_url', 'base_url', 'baseurl', 'request_url', 'url'])
+        // 支持 cc-switch v3.8.0+ 的 config_json 字段
+        const modelsStr = getValue(['models', 'model', 'model_config', 'config', 'config_json'])
+        const isActiveStr = getValue(['isactive', 'is_active', 'active'])
+        const isActive = isActiveStr === '1' || isActiveStr === 'true' || isActiveStr === 'TRUE'
+        // cc-switch v3.8.0+ 额外字段
+        const memo = getValue(['memo', 'notes', 'description', 'note'])
+        const docUrl = getValue(['doc_url', 'website', 'website_url', 'document_url'])
+        
+        // 解析 models/config JSON (支持 cc-switch v3.8.0+ 的 config_json 格式)
+        let modelsData: Record<string, any> = {}
+        try {
+          if (modelsStr && (modelsStr.startsWith('{') || modelsStr.startsWith('['))) {
+            const parsed = JSON.parse(modelsStr)
+            // cc-switch v3.8.0+ config_json 可能包含嵌套的 model、settings 等
+            if (parsed.model) {
+              modelsData = { main: parsed.model, ...parsed }
+            } else if (parsed.models) {
+              modelsData = parsed.models
+            } else {
+              modelsData = parsed
+            }
+          } else if (modelsStr) {
+            modelsData = { main: modelsStr }
+          }
+        } catch {
+          modelsData = { main: modelsStr || '' }
+        }
+        
+        const baseProvider = {
+          id,
+          name,
+          notes: memo || '',
+          websiteUrl: docUrl || '',
+          apiKey,
+          requestUrl,
+          configJson: {},
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          authMode: 'apikey' as const,
+          environmentMode: 'local' as const,
+          sshRemotes: [],
+          activeRemoteId: null
+        }
+        
+        if (providerType === 'codex' || providerType === 'openai') {
+          const provider: CodexProvider = {
+            ...baseProvider,
+            type: 'codex',
+            model: modelsData.main || modelsData.model || '',
+            authJson: {},
+            approvalPolicy: (modelsData.approvalPolicy || modelsData.approval_policy) as CodexProvider['approvalPolicy'] || undefined,
+            sandboxMode: (modelsData.sandboxMode || modelsData.sandbox_mode) as CodexProvider['sandboxMode'] || undefined,
+            modelProvider: modelsData.modelProvider || modelsData.model_provider || undefined
+          }
+          provider.configJson = generateCodexConfigJson(provider)
+          codexProviders.push(provider)
+          if (isActive) codexActiveId = id
+        } else if (providerType === 'gemini' || providerType === 'google') {
+          const provider: GeminiProvider = {
+            ...baseProvider,
+            type: 'gemini',
+            model: modelsData.main || modelsData.model || ''
+          }
+          provider.configJson = generateGeminiConfigJson(provider)
+          geminiProviders.push(provider)
+          if (isActive) geminiActiveId = id
+        } else {
+          // 默认为 claude
+          const provider: ClaudeProvider = {
+            ...baseProvider,
+            type: 'claude',
+            mainModel: modelsData.main || modelsData.model || '',
+            haikuModel: modelsData.haiku || '',
+            sonnetModel: modelsData.sonnet || '',
+            opusModel: modelsData.opus || ''
+          }
+          provider.configJson = generateConfigJson(provider)
+          claudeProviders.push(provider)
+          if (isActive) claudeActiveId = id
+        }
+      }
+    }
+    
+    // 如果新格式没匹配到，尝试旧格式（固定位置解析）
+    if (claudeProviders.length === 0 && codexProviders.length === 0 && geminiProviders.length === 0) {
+      // 旧格式: INSERT INTO providers VALUES (id, type, name, apiKey, apiUrl, models, isActive, ...);
+      const oldFormatRegex = /INSERT\s+INTO\s+providers\s*\([^)]+\)\s*VALUES\s*\(([^;]+)\);/gi
+      let match
+      
+      while ((match = oldFormatRegex.exec(sql)) !== null) {
       const valuesStr = match[1]
       const values = parseInsertValues(valuesStr)
       
@@ -768,7 +905,8 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
           if (isActive) claudeActiveId = id
         }
       }
-    }
+      }  // 关闭旧格式 while 循环
+    }  // 关闭旧格式 if 条件
     
     const totalCount = claudeProviders.length + codexProviders.length + geminiProviders.length
     
@@ -797,9 +935,40 @@ export function importProvidersSQL(sql: string): { success: boolean; count: numb
       }
     }
     
-    return { success: false, count: 0, error: '未找到有效的配置数据' }
+    // 如果仍然没有找到数据，提供更详细的错误信息
+    const hasInsert = sql.includes('INSERT')
+    const hasProviders = /providers?/i.test(sql)
+    const hasCreateTable = sql.includes('CREATE TABLE')
+    
+    // 尝试检测 cc-switch v3.8.0+ 的 SQLite dump 格式
+    const ccSwitchV38Pattern = /CREATE TABLE.*?"?providers"?\s*\(/i
+    const isCcSwitchFormat = ccSwitchV38Pattern.test(sql)
+    
+    if (!hasInsert) {
+      if (isCcSwitchFormat || hasCreateTable) {
+        return { 
+          success: false, 
+          count: 0, 
+          error: '检测到数据库表结构，但未找到 INSERT 数据。\n\n如果你是从 cc-switch 导出 SQL：\n1. 打开 cc-switch 设置\n2. 选择"导出数据" → "SQL 格式"\n3. 确保勾选"包含数据"选项\n\n如果这是 .db 文件，请使用 SQLite 工具执行: sqlite3 your.db .dump > backup.sql' 
+        }
+      }
+      return { success: false, count: 0, error: '未找到 INSERT 语句。如果这是 SQLite 数据库文件 (.db)，请先用 SQLite 工具导出为 SQL 文本格式' }
+    }
+    if (!hasProviders) {
+      return { success: false, count: 0, error: '未找到 providers 表。请确保 SQL 文件包含 provider 配置数据' }
+    }
+    
+    // 提供更详细的调试信息
+    const insertMatches = sql.match(/INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+[^\s(]+/gi) || []
+    const tableNames = insertMatches.map(m => m.replace(/INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+/i, '').trim())
+    
+    return { 
+      success: false, 
+      count: 0, 
+      error: `未找到有效的配置数据。\n\n检测到的 INSERT 表: ${tableNames.join(', ') || '无'}\n\n支持的格式:\n- cc-switch v3.7.x: INSERT INTO providers (id, type, name, apiKey, apiUrl, models, ...)\n- cc-switch v3.8.0+: INSERT INTO providers (id, app, name, api_key, base_url, config_json, ...)\n\n如果格式不匹配，请尝试使用 JSON 格式导入` 
+    }
   } catch (error) {
-    return { success: false, count: 0, error: String(error) }
+    return { success: false, count: 0, error: `解析错误: ${String(error)}` }
   }
 }
 
@@ -895,8 +1064,18 @@ export function importProvidersJSON(json: string): { success: boolean; count: nu
 export function importProviders(content: string): { success: boolean; count: number; error?: string; format?: string } {
   const trimmed = content.trim()
   
+  // 检测是否为二进制 SQLite 数据库文件
+  if (trimmed.startsWith('SQLite format') || content.includes('\x00')) {
+    return { 
+      success: false, 
+      count: 0, 
+      error: '检测到 SQLite 数据库文件 (.db)。\n\n请使用以下方法之一导出为文本格式：\n1. 使用 DB Browser for SQLite 导出为 SQL\n2. 命令行: sqlite3 cc-switch.db .dump > export.sql\n3. 在 cc-switch 应用中使用"导出配置"功能', 
+      format: 'sqlite-binary' 
+    }
+  }
+  
   // 检测是否为 SQL 格式
-  if (trimmed.includes('CREATE TABLE') || trimmed.includes('INSERT INTO')) {
+  if (trimmed.includes('CREATE TABLE') || trimmed.includes('INSERT INTO') || trimmed.includes('INSERT OR')) {
     const result = importProvidersSQL(content)
     return { ...result, format: 'sql' }
   }
@@ -907,7 +1086,14 @@ export function importProviders(content: string): { success: boolean; count: num
     return { ...result, format: 'json' }
   }
   
-  return { success: false, count: 0, error: '无法识别的文件格式', format: 'unknown' }
+  // 提供更详细的错误提示
+  const preview = trimmed.substring(0, 100)
+  return { 
+    success: false, 
+    count: 0, 
+    error: `无法识别的文件格式。\n\n支持的格式：\n• JSON 文件 (.json)\n• SQL 导出文件 (.sql)\n\n文件开头内容: ${preview}...`, 
+    format: 'unknown' 
+  }
 }
 
 // 保留旧的导出函数名以保持兼容
