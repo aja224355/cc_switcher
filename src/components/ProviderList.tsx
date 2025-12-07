@@ -1,35 +1,83 @@
-import { useState } from 'react'
-import { Plus, Edit2, Trash2, Check, Copy, Download, Upload, Settings, ExternalLink } from 'lucide-react'
-import { ClaudeProvider } from '@/types/provider'
+import { useState, useRef, useEffect } from 'react'
+import { Plus, Edit2, Trash2, Check, Copy, Download, Upload, Settings, ExternalLink, FileJson, Database } from 'lucide-react'
+import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType } from '@/types/provider'
+
+type Provider = ClaudeProvider | CodexProvider | GeminiProvider
+
+interface TabConfig {
+  type: ProviderType
+  label: string
+  color: string
+}
 
 interface ProviderListProps {
-  providers: ClaudeProvider[]
+  providers: Provider[]
   activeProviderId: string | null
+  providerType: ProviderType
+  tabs: TabConfig[]
+  onTabChange: (type: ProviderType) => void
   onAdd: () => void
-  onEdit: (provider: ClaudeProvider) => void
+  onEdit: (provider: Provider) => void
   onDelete: (id: string) => void
   onActivate: (id: string) => void
   onExport: () => void
   onImport: () => void
+  showExportMenu?: boolean
+  onExportFormat?: (format: 'json' | 'sql') => void
+  onCloseExportMenu?: () => void
 }
 
 export default function ProviderList({
   providers,
   activeProviderId,
+  providerType,
+  tabs,
+  onTabChange,
   onAdd,
   onEdit,
   onDelete,
   onActivate,
   onExport,
   onImport,
+  showExportMenu = false,
+  onExportFormat,
+  onCloseExportMenu,
 }: ProviderListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
 
-  const handleCopyConfig = (provider: ClaudeProvider) => {
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        onCloseExportMenu?.()
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu, onCloseExportMenu])
+
+  const handleCopyConfig = (provider: Provider) => {
     const config = JSON.stringify(provider.configJson, null, 2)
     navigator.clipboard.writeText(config)
     setCopiedId(provider.id)
     setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const getProviderModel = (provider: Provider): string => {
+    if (provider.type === 'claude') {
+      return (provider as ClaudeProvider).mainModel
+    } else if (provider.type === 'codex') {
+      return (provider as CodexProvider).model
+    } else {
+      return (provider as GeminiProvider).model
+    }
+  }
+
+  const getTabColor = () => {
+    const tab = tabs.find(t => t.type === providerType)
+    return tab?.color || '#e94560'
   }
 
   return (
@@ -38,32 +86,85 @@ export default function ProviderList({
       <div className="border-b border-[#3d3d5c] px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Settings className="w-6 h-6 text-[#e94560]" />
-            <h1 className="text-xl font-semibold">Claude Code 配置管理</h1>
+            <Settings className="w-6 h-6" style={{ color: getTabColor() }} />
+            <h1 className="text-xl font-semibold">配置管理</h1>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onImport}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-[#2d2d44] hover:bg-[#3d3d5c] rounded-lg transition-colors"
+              title="支持 JSON 和 SQL 格式 (兼容 cc-switch)"
             >
               <Upload className="w-4 h-4" />
               导入
             </button>
-            <button
-              onClick={onExport}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-[#2d2d44] hover:bg-[#3d3d5c] rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              导出
-            </button>
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={onExport}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-[#2d2d44] hover:bg-[#3d3d5c] rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                导出
+              </button>
+              {showExportMenu && onExportFormat && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-[#2d2d44] border border-[#3d3d5c] rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={() => onExportFormat('json')}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#3d3d5c] transition-colors text-left"
+                  >
+                    <FileJson className="w-4 h-4 text-[#4da6ff]" />
+                    <div>
+                      <div className="font-medium">JSON 格式</div>
+                      <div className="text-xs text-gray-500">标准配置格式</div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => onExportFormat('sql')}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#3d3d5c] transition-colors text-left border-t border-[#3d3d5c]"
+                  >
+                    <Database className="w-4 h-4 text-[#e94560]" />
+                    <div>
+                      <div className="font-medium">SQL 格式</div>
+                      <div className="text-xs text-gray-500">兼容 cc-switch</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={onAdd}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-[#e94560] hover:bg-[#d63850] rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-colors"
+              style={{ backgroundColor: getTabColor() }}
             >
               <Plus className="w-4 h-4" />
               添加供应商
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-[#3d3d5c] px-6">
+        <div className="flex gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.type}
+              onClick={() => onTabChange(tab.type)}
+              className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                providerType === tab.type
+                  ? 'text-white'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              {tab.label}
+              {providerType === tab.type && (
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-0.5"
+                  style={{ backgroundColor: tab.color }}
+                />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -75,8 +176,8 @@ export default function ProviderList({
               <Settings className="w-8 h-8 text-gray-500" />
             </div>
             <h2 className="text-xl font-medium text-gray-300 mb-2">暂无配置</h2>
-            <p className="text-gray-500 mb-6">点击上方按钮添加您的第一个 Claude Code 供应商配置</p>
-            <button onClick={onAdd} className="btn-primary">
+            <p className="text-gray-500 mb-6">点击上方按钮添加您的第一个 {tabs.find(t => t.type === providerType)?.label} 供应商配置</p>
+            <button onClick={onAdd} className="btn-primary" style={{ backgroundColor: getTabColor() }}>
               <Plus className="w-4 h-4 inline mr-2" />
               添加供应商
             </button>
@@ -88,12 +189,15 @@ export default function ProviderList({
                 key={provider.id}
                 className={`card relative ${
                   activeProviderId === provider.id
-                    ? 'border-[#e94560] bg-[#1a1a2e]'
+                    ? 'bg-[#1a1a2e]'
                     : ''
                 }`}
+                style={{
+                  borderColor: activeProviderId === provider.id ? getTabColor() : undefined
+                }}
               >
                 {activeProviderId === provider.id && (
-                  <div className="absolute top-4 right-4 flex items-center gap-2 text-[#e94560] text-sm">
+                  <div className="absolute top-4 right-4 flex items-center gap-2 text-sm" style={{ color: getTabColor() }}>
                     <Check className="w-4 h-4" />
                     当前使用
                   </div>
@@ -108,7 +212,8 @@ export default function ProviderList({
                           href={provider.websiteUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[#e94560] hover:text-[#f39c12] transition-colors"
+                          className="hover:opacity-80 transition-opacity"
+                          style={{ color: getTabColor() }}
                         >
                           <ExternalLink className="w-4 h-4" />
                         </a>
@@ -126,11 +231,11 @@ export default function ProviderList({
                           </code>
                         </span>
                       )}
-                      {provider.mainModel && (
+                      {getProviderModel(provider) && (
                         <span className="flex items-center gap-1">
                           <span className="text-gray-400">模型:</span>
-                          <code className="bg-[#2d2d44] px-2 py-0.5 rounded text-xs">
-                            {provider.mainModel}
+                          <code className="bg-[#2d2d44] px-2 py-0.5 rounded text-xs" style={{ color: getTabColor() }}>
+                            {getProviderModel(provider)}
                           </code>
                         </span>
                       )}
@@ -200,6 +305,32 @@ export default function ProviderList({
                 Linux: ~/.claude/settings.json
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Import/Export Info */}
+        <div className="mt-4 card">
+          <h3 className="text-lg font-semibold mb-4">导入/导出格式</h3>
+          <div className="space-y-3 text-sm text-gray-400">
+            <div className="flex items-start gap-3">
+              <FileJson className="w-5 h-5 text-[#4da6ff] mt-0.5" />
+              <div>
+                <p className="text-gray-300 font-medium">JSON 格式</p>
+                <p className="text-gray-500">标准配置格式，包含完整的供应商信息</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Database className="w-5 h-5 text-[#e94560] mt-0.5" />
+              <div>
+                <p className="text-gray-300 font-medium">SQL 格式</p>
+                <p className="text-gray-500">
+                  兼容 <a href="https://github.com/farion1231/cc-switch" target="_blank" rel="noopener noreferrer" className="text-[#e94560] hover:underline">cc-switch</a> 项目的数据库格式
+                </p>
+              </div>
+            </div>
+            <p className="text-gray-500 text-xs mt-2">
+              导入时会自动检测文件格式，支持 .json 和 .sql 文件
+            </p>
           </div>
         </div>
       </div>

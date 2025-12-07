@@ -1,16 +1,53 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Lightbulb, Zap, ExternalLink } from 'lucide-react'
-import { ClaudeProvider, ProviderFormData } from '@/types/provider'
-import { generateConfigJson } from '@/utils/storage'
+import { ClaudeProvider, CodexProvider, GeminiProvider, ProviderType } from '@/types/provider'
+import { generateConfigJson, generateCodexConfigJson, generateGeminiConfigJson } from '@/utils/storage'
 import { v4 as uuidv4 } from 'uuid'
 
+type Provider = ClaudeProvider | CodexProvider | GeminiProvider
+
 interface ProviderFormProps {
-  provider?: ClaudeProvider | null
-  onSave: (provider: ClaudeProvider) => void
+  provider?: Provider | null
+  providerType: ProviderType
+  onSave: (provider: Provider) => void
   onCancel: () => void
 }
 
-const initialFormData: ProviderFormData = {
+// Claude 表单数据
+interface ClaudeFormData {
+  name: string
+  notes: string
+  websiteUrl: string
+  apiKey: string
+  requestUrl: string
+  mainModel: string
+  haikuModel: string
+  sonnetModel: string
+  opusModel: string
+}
+
+// Codex 表单数据
+interface CodexFormData {
+  name: string
+  notes: string
+  websiteUrl: string
+  apiKey: string
+  requestUrl: string
+  model: string
+  authJson: string
+}
+
+// Gemini 表单数据
+interface GeminiFormData {
+  name: string
+  notes: string
+  websiteUrl: string
+  apiKey: string
+  requestUrl: string
+  model: string
+}
+
+const initialClaudeFormData: ClaudeFormData = {
   name: '',
   notes: '',
   websiteUrl: '',
@@ -22,43 +59,164 @@ const initialFormData: ProviderFormData = {
   opusModel: '',
 }
 
-export default function ProviderForm({ provider, onSave, onCancel }: ProviderFormProps) {
-  const [formData, setFormData] = useState<ProviderFormData>(initialFormData)
+const initialCodexFormData: CodexFormData = {
+  name: '',
+  notes: '',
+  websiteUrl: '',
+  apiKey: '',
+  requestUrl: '',
+  model: '',
+  authJson: '',
+}
+
+const initialGeminiFormData: GeminiFormData = {
+  name: '',
+  notes: '',
+  websiteUrl: '',
+  apiKey: '',
+  requestUrl: '',
+  model: '',
+}
+
+export default function ProviderForm({ provider, providerType, onSave, onCancel }: ProviderFormProps) {
+  const [claudeFormData, setClaudeFormData] = useState<ClaudeFormData>(initialClaudeFormData)
+  const [codexFormData, setCodexFormData] = useState<CodexFormData>(initialCodexFormData)
+  const [geminiFormData, setGeminiFormData] = useState<GeminiFormData>(initialGeminiFormData)
   const [writeToGlobal, setWriteToGlobal] = useState(false)
 
   useEffect(() => {
     if (provider) {
-      setFormData({
-        name: provider.name,
-        notes: provider.notes,
-        websiteUrl: provider.websiteUrl,
-        apiKey: provider.apiKey,
-        requestUrl: provider.requestUrl,
-        mainModel: provider.mainModel,
-        haikuModel: provider.haikuModel,
-        sonnetModel: provider.sonnetModel,
-        opusModel: provider.opusModel,
-      })
+      if (provider.type === 'claude') {
+        const p = provider as ClaudeProvider
+        setClaudeFormData({
+          name: p.name,
+          notes: p.notes,
+          websiteUrl: p.websiteUrl,
+          apiKey: p.apiKey,
+          requestUrl: p.requestUrl,
+          mainModel: p.mainModel,
+          haikuModel: p.haikuModel,
+          sonnetModel: p.sonnetModel,
+          opusModel: p.opusModel,
+        })
+      } else if (provider.type === 'codex') {
+        const p = provider as CodexProvider
+        setCodexFormData({
+          name: p.name,
+          notes: p.notes,
+          websiteUrl: p.websiteUrl,
+          apiKey: p.apiKey,
+          requestUrl: p.requestUrl,
+          model: p.model,
+          authJson: JSON.stringify(p.authJson || {}, null, 2),
+        })
+      } else if (provider.type === 'gemini') {
+        const p = provider as GeminiProvider
+        setGeminiFormData({
+          name: p.name,
+          notes: p.notes,
+          websiteUrl: p.websiteUrl,
+          apiKey: p.apiKey,
+          requestUrl: p.requestUrl,
+          model: p.model,
+        })
+      }
     }
   }, [provider])
 
-  const handleChange = (field: keyof ProviderFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  const handleClaudeChange = (field: keyof ClaudeFormData, value: string) => {
+    setClaudeFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleCodexChange = (field: keyof CodexFormData, value: string) => {
+    setCodexFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleGeminiChange = (field: keyof GeminiFormData, value: string) => {
+    setGeminiFormData(prev => ({ ...prev, [field]: value }))
   }
 
   const handleSubmit = () => {
     const now = Date.now()
-    const newProvider: ClaudeProvider = {
-      id: provider?.id || uuidv4(),
-      ...formData,
-      configJson: generateConfigJson({ ...formData, id: '', configJson: {}, createdAt: 0, updatedAt: 0 } as ClaudeProvider),
-      createdAt: provider?.createdAt || now,
-      updatedAt: now,
+    
+    if (providerType === 'claude') {
+      const newProvider: ClaudeProvider = {
+        id: provider?.id || uuidv4(),
+        type: 'claude',
+        ...claudeFormData,
+        configJson: generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0 } as ClaudeProvider),
+        createdAt: provider?.createdAt || now,
+        updatedAt: now,
+      }
+      onSave(newProvider)
+    } else if (providerType === 'codex') {
+      let authJson = {}
+      try {
+        authJson = codexFormData.authJson ? JSON.parse(codexFormData.authJson) : {}
+      } catch {
+        authJson = {}
+      }
+      const newProvider: CodexProvider = {
+        id: provider?.id || uuidv4(),
+        type: 'codex',
+        name: codexFormData.name,
+        notes: codexFormData.notes,
+        websiteUrl: codexFormData.websiteUrl,
+        apiKey: codexFormData.apiKey,
+        requestUrl: codexFormData.requestUrl,
+        model: codexFormData.model,
+        authJson,
+        configJson: generateCodexConfigJson({ ...codexFormData, authJson }),
+        createdAt: provider?.createdAt || now,
+        updatedAt: now,
+      }
+      onSave(newProvider)
+    } else if (providerType === 'gemini') {
+      const newProvider: GeminiProvider = {
+        id: provider?.id || uuidv4(),
+        type: 'gemini',
+        ...geminiFormData,
+        configJson: generateGeminiConfigJson(geminiFormData),
+        createdAt: provider?.createdAt || now,
+        updatedAt: now,
+      }
+      onSave(newProvider)
     }
-    onSave(newProvider)
   }
 
-  const configJson = generateConfigJson({ ...formData, id: '', configJson: {}, createdAt: 0, updatedAt: 0 } as ClaudeProvider)
+  const getConfigJson = () => {
+    if (providerType === 'claude') {
+      return generateConfigJson({ ...claudeFormData, id: '', type: 'claude', configJson: {}, createdAt: 0, updatedAt: 0 } as ClaudeProvider)
+    } else if (providerType === 'codex') {
+      let authJson = {}
+      try {
+        authJson = codexFormData.authJson ? JSON.parse(codexFormData.authJson) : {}
+      } catch {
+        authJson = {}
+      }
+      return generateCodexConfigJson({ ...codexFormData, authJson })
+    } else {
+      return generateGeminiConfigJson(geminiFormData)
+    }
+  }
+
+  const getTabColor = () => {
+    switch (providerType) {
+      case 'claude': return '#e94560'
+      case 'codex': return '#10b981'
+      case 'gemini': return '#4da6ff'
+    }
+  }
+
+  const getTabLabel = () => {
+    switch (providerType) {
+      case 'claude': return 'Claude'
+      case 'codex': return 'Codex'
+      case 'gemini': return 'Gemini'
+    }
+  }
+
+  const configJson = getConfigJson()
 
   return (
     <div className="min-h-screen bg-[#1a1a2e]">
@@ -72,7 +230,7 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-xl font-semibold">
-            {provider ? '编辑' : '添加'} Claude Code 供应商
+            {provider ? '编辑' : '添加'} <span style={{ color: getTabColor() }}>{getTabLabel()}</span> 供应商
           </h1>
         </div>
       </div>
@@ -80,16 +238,20 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
       {/* Form Content */}
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="space-y-6">
-          {/* Row 1: Name and Notes */}
+          {/* Common Fields: Name and Notes */}
           <div className="grid grid-cols-2 gap-6">
             <div>
               <label className="input-label">供应商名称</label>
               <input
                 type="text"
                 className="input-field"
-                placeholder="例如：Claude 官方"
-                value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
+                placeholder={`例如：${getTabLabel()} 官方`}
+                value={providerType === 'claude' ? claudeFormData.name : providerType === 'codex' ? codexFormData.name : geminiFormData.name}
+                onChange={(e) => {
+                  if (providerType === 'claude') handleClaudeChange('name', e.target.value)
+                  else if (providerType === 'codex') handleCodexChange('name', e.target.value)
+                  else handleGeminiChange('name', e.target.value)
+                }}
               />
             </div>
             <div>
@@ -98,8 +260,12 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
                 type="text"
                 className="input-field"
                 placeholder="例如：公司专用账号"
-                value={formData.notes}
-                onChange={(e) => handleChange('notes', e.target.value)}
+                value={providerType === 'claude' ? claudeFormData.notes : providerType === 'codex' ? codexFormData.notes : geminiFormData.notes}
+                onChange={(e) => {
+                  if (providerType === 'claude') handleClaudeChange('notes', e.target.value)
+                  else if (providerType === 'codex') handleCodexChange('notes', e.target.value)
+                  else handleGeminiChange('notes', e.target.value)
+                }}
               />
             </div>
           </div>
@@ -111,8 +277,12 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
               type="text"
               className="input-field"
               placeholder="https://"
-              value={formData.websiteUrl}
-              onChange={(e) => handleChange('websiteUrl', e.target.value)}
+              value={providerType === 'claude' ? claudeFormData.websiteUrl : providerType === 'codex' ? codexFormData.websiteUrl : geminiFormData.websiteUrl}
+              onChange={(e) => {
+                if (providerType === 'claude') handleClaudeChange('websiteUrl', e.target.value)
+                else if (providerType === 'codex') handleCodexChange('websiteUrl', e.target.value)
+                else handleGeminiChange('websiteUrl', e.target.value)
+              }}
             />
           </div>
 
@@ -123,8 +293,12 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
               type="password"
               className="input-field bg-[#3d2a1a] border-[#f39c12]"
               placeholder="只需要填这里，下方配置会自动填充"
-              value={formData.apiKey}
-              onChange={(e) => handleChange('apiKey', e.target.value)}
+              value={providerType === 'claude' ? claudeFormData.apiKey : providerType === 'codex' ? codexFormData.apiKey : geminiFormData.apiKey}
+              onChange={(e) => {
+                if (providerType === 'claude') handleClaudeChange('apiKey', e.target.value)
+                else if (providerType === 'codex') handleCodexChange('apiKey', e.target.value)
+                else handleGeminiChange('apiKey', e.target.value)
+              }}
             />
           </div>
 
@@ -132,7 +306,7 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-300">请求地址</label>
-              <button className="flex items-center gap-1 text-sm text-[#e94560] hover:text-[#f39c12] transition-colors">
+              <button className="flex items-center gap-1 text-sm hover:opacity-80 transition-opacity" style={{ color: getTabColor() }}>
                 <Zap className="w-4 h-4" />
                 管理与测速
               </button>
@@ -141,65 +315,122 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
               type="text"
               className="input-field"
               placeholder="https://your-api-endpoint.com"
-              value={formData.requestUrl}
-              onChange={(e) => handleChange('requestUrl', e.target.value)}
+              value={providerType === 'claude' ? claudeFormData.requestUrl : providerType === 'codex' ? codexFormData.requestUrl : geminiFormData.requestUrl}
+              onChange={(e) => {
+                if (providerType === 'claude') handleClaudeChange('requestUrl', e.target.value)
+                else if (providerType === 'codex') handleCodexChange('requestUrl', e.target.value)
+                else handleGeminiChange('requestUrl', e.target.value)
+              }}
             />
             <div className="warning-box mt-3">
               <Lightbulb className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <span>填写兼容 Claude API 的服务端点地址，不要以斜杠结尾</span>
+              <span>填写兼容 {getTabLabel()} API 的服务端点地址，不要以斜杠结尾</span>
             </div>
           </div>
 
-          {/* Model Settings */}
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <label className="input-label">主模型</label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="claude-3-5-sonnet-20241022"
-                value={formData.mainModel}
-                onChange={(e) => handleChange('mainModel', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="input-label">Haiku 默认模型</label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="claude-3-haiku-20240307"
-                value={formData.haikuModel}
-                onChange={(e) => handleChange('haikuModel', e.target.value)}
-              />
-            </div>
-          </div>
+          {/* Claude-specific Model Settings */}
+          {providerType === 'claude' && (
+            <>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="input-label">主模型</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="claude-3-5-sonnet-20241022"
+                    value={claudeFormData.mainModel}
+                    onChange={(e) => handleClaudeChange('mainModel', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Haiku 默认模型</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="claude-3-haiku-20240307"
+                    value={claudeFormData.haikuModel}
+                    onChange={(e) => handleClaudeChange('haikuModel', e.target.value)}
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <label className="input-label">Sonnet 默认模型</label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="claude-3-5-sonnet-20241022"
-                value={formData.sonnetModel}
-                onChange={(e) => handleChange('sonnetModel', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="input-label">Opus 默认模型</label>
-              <input
-                type="text"
-                className="input-field"
-                placeholder="claude-3-opus-20240229"
-                value={formData.opusModel}
-                onChange={(e) => handleChange('opusModel', e.target.value)}
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="input-label">Sonnet 默认模型</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="claude-3-5-sonnet-20241022"
+                    value={claudeFormData.sonnetModel}
+                    onChange={(e) => handleClaudeChange('sonnetModel', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Opus 默认模型</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="claude-3-opus-20240229"
+                    value={claudeFormData.opusModel}
+                    onChange={(e) => handleClaudeChange('opusModel', e.target.value)}
+                  />
+                </div>
+              </div>
 
-          <p className="text-sm text-gray-500">
-            可选：指定默认使用的 Claude 模型，留空则使用系统默认。
-          </p>
+              <p className="text-sm text-gray-500">
+                可选：指定默认使用的 Claude 模型，留空则使用系统默认。
+              </p>
+            </>
+          )}
+
+          {/* Codex-specific Model Settings */}
+          {providerType === 'codex' && (
+            <>
+              <div>
+                <label className="input-label">模型</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="codex-mini-latest"
+                  value={codexFormData.model}
+                  onChange={(e) => handleCodexChange('model', e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="input-label">认证 JSON (可选)</label>
+                <textarea
+                  className="input-field min-h-[100px] font-mono text-sm"
+                  placeholder='{"token": "your-token"}'
+                  value={codexFormData.authJson}
+                  onChange={(e) => handleCodexChange('authJson', e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  可选：额外的认证信息，JSON 格式
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Gemini-specific Model Settings */}
+          {providerType === 'gemini' && (
+            <>
+              <div>
+                <label className="input-label">模型</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="gemini-pro"
+                  value={geminiFormData.model}
+                  onChange={(e) => handleGeminiChange('model', e.target.value)}
+                />
+              </div>
+
+              <p className="text-sm text-gray-500">
+                可选：指定默认使用的 Gemini 模型，留空则使用系统默认。
+              </p>
+            </>
+          )}
 
           {/* Config JSON Preview */}
           <div>
@@ -215,7 +446,7 @@ export default function ProviderForm({ provider, onSave, onCancel }: ProviderFor
                   />
                   写入通用配置
                 </label>
-                <button className="text-sm text-[#e94560] hover:text-[#f39c12] transition-colors flex items-center gap-1">
+                <button className="text-sm hover:opacity-80 transition-opacity flex items-center gap-1" style={{ color: getTabColor() }}>
                   编辑通用配置
                   <ExternalLink className="w-3 h-3" />
                 </button>
