@@ -9,6 +9,8 @@ interface TabConfig {
   type: ProviderType
   label: string
   color: string
+  bgColor?: string
+  icon?: string
 }
 
 interface ProviderListProps {
@@ -119,14 +121,37 @@ export default function ProviderList({
     return tab?.color || '#e94560'
   }
 
+  const getTabBgColor = () => {
+    const tab = tabs.find(t => t.type === providerType)
+    return tab?.bgColor || 'rgba(233, 69, 96, 0.1)'
+  }
+
   return (
     <div className="min-h-screen bg-[#1a1a2e]">
       {/* Header */}
       <div className="border-b border-[#3d3d5c] px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Settings className="w-6 h-6" style={{ color: getTabColor() }} />
-            <h1 className="text-xl font-semibold">配置管理</h1>
+            <div 
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-lg"
+              style={{ backgroundColor: getTabBgColor() }}
+            >
+              {tabs.find(t => t.type === providerType)?.icon}
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold flex items-center gap-2">
+                配置管理
+                <span 
+                  className="text-sm px-2 py-0.5 rounded-full"
+                  style={{ 
+                    backgroundColor: getTabBgColor(),
+                    color: getTabColor()
+                  }}
+                >
+                  {tabs.find(t => t.type === providerType)?.label}
+                </span>
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -261,18 +286,22 @@ export default function ProviderList({
 
       {/* Tabs */}
       <div className="border-b border-[#3d3d5c] px-6">
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           {tabs.map((tab) => (
             <button
               key={tab.type}
               onClick={() => onTabChange(tab.type)}
-              className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+              className={`px-6 py-3 text-sm font-medium transition-all duration-200 relative rounded-t-lg flex items-center gap-2 ${
                 providerType === tab.type
                   ? 'text-white'
                   : 'text-gray-400 hover:text-gray-200'
               }`}
+              style={{
+                backgroundColor: providerType === tab.type ? (tab.bgColor || 'transparent') : 'transparent',
+              }}
             >
-              {tab.label}
+              <span className="text-base">{tab.icon}</span>
+              <span>{tab.label}</span>
               {providerType === tab.type && (
                 <div
                   className="absolute bottom-0 left-0 right-0 h-0.5"
@@ -581,20 +610,31 @@ export default function ProviderList({
           </div>
         ) : (
           <div className="grid gap-4">
-            {providers.map((provider) => (
+            {providers.map((provider) => {
+              const tabConfig = tabs.find(t => t.type === providerType)
+              const providerBgColor = tabConfig?.bgColor || 'transparent'
+              
+              return (
               <div
                 key={provider.id}
-                className={`card relative ${
+                className={`card relative transition-all duration-200 hover:shadow-lg ${
                   activeProviderId === provider.id
                     ? 'bg-[#1a1a2e]'
                     : ''
                 }`}
                 style={{
-                  borderColor: activeProviderId === provider.id ? getTabColor() : undefined
+                  borderColor: activeProviderId === provider.id ? getTabColor() : undefined,
+                  borderLeftWidth: '4px',
+                  borderLeftColor: getTabColor(),
+                  background: activeProviderId === provider.id ? providerBgColor : undefined,
                 }}
               >
                 {activeProviderId === provider.id && (
-                  <div className="absolute top-4 right-4 flex items-center gap-2 text-sm" style={{ color: getTabColor() }}>
+                  <div className="absolute top-4 right-4 flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full" 
+                    style={{ 
+                      color: getTabColor(),
+                      backgroundColor: providerBgColor,
+                    }}>
                     <Check className="w-4 h-4" />
                     当前使用
                   </div>
@@ -603,6 +643,17 @@ export default function ProviderList({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
+                      {/* Provider 类型徽章 */}
+                      <span 
+                        className="px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={{ 
+                          backgroundColor: providerBgColor,
+                          color: getTabColor(),
+                          border: `1px solid ${getTabColor()}30`
+                        }}
+                      >
+                        {tabConfig?.icon} {tabConfig?.label}
+                      </span>
                       <h3 className="text-lg font-semibold">{provider.name || '未命名供应商'}</h3>
                       {provider.websiteUrl && (
                         <a
@@ -722,7 +773,11 @@ export default function ProviderList({
                   {activeProviderId !== provider.id && !onEnvActivate && (
                     <button
                       onClick={() => onActivate(provider.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[#0f3460] hover:bg-[#1a4a7a] text-[#4da6ff] rounded transition-colors"
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-colors"
+                      style={{ 
+                        backgroundColor: `${getTabColor()}20`,
+                        color: getTabColor()
+                      }}
                     >
                       <Check className="w-4 h-4" />
                       使用此配置
@@ -760,25 +815,49 @@ export default function ProviderList({
                   </button>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
 
         {/* Usage Instructions */}
-        <div className="mt-8 card">
-          <h3 className="text-lg font-semibold mb-4">使用说明</h3>
+        <div className="mt-8 card" style={{ borderLeftWidth: '4px', borderLeftColor: getTabColor() }}>
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <span style={{ color: getTabColor() }}>{tabs.find(t => t.type === providerType)?.icon}</span>
+            {tabs.find(t => t.type === providerType)?.label} 使用说明
+          </h3>
           <div className="space-y-3 text-sm text-gray-400">
-            <p>1. 点击"添加供应商"创建新的 Claude Code 配置</p>
+            <p>1. 点击"添加供应商"创建新的 {tabs.find(t => t.type === providerType)?.label} 配置</p>
             <p>2. 填写 API Key 和请求地址等信息</p>
             <p>3. 点击"使用此配置"激活配置</p>
-            <p>4. 复制生成的配置 JSON 到 Claude Code 的配置文件中</p>
+            <p>4. 复制生成的配置到对应的配置文件中</p>
             <div className="mt-4 p-4 bg-[#0f0f1a] rounded-lg">
               <p className="text-gray-300 mb-2">配置文件位置：</p>
-              <code className="text-[#e94560]">~/.claude/settings.json</code>
-              <p className="text-gray-500 mt-2 text-xs">
-                Windows WSL: /home/用户名/.claude/settings.json<br />
-                Linux: ~/.claude/settings.json
-              </p>
+              {providerType === 'claude' && (
+                <>
+                  <code className="text-[#e94560]">~/.claude/settings.json</code>
+                  <p className="text-gray-500 mt-2 text-xs">
+                    Windows WSL: /home/用户名/.claude/settings.json<br />
+                    Linux: ~/.claude/settings.json
+                  </p>
+                </>
+              )}
+              {providerType === 'codex' && (
+                <>
+                  <code className="text-[#10b981]">~/.codex/config.toml</code>
+                  <p className="text-gray-500 mt-2 text-xs">
+                    Windows WSL: /home/用户名/.codex/config.toml<br />
+                    Linux: ~/.codex/config.toml
+                  </p>
+                </>
+              )}
+              {providerType === 'gemini' && (
+                <>
+                  <code className="text-[#4da6ff]">~/.gemini/settings.json</code>
+                  <p className="text-gray-500 mt-2 text-xs">
+                    环境变量: GEMINI_API_KEY, GOOGLE_GEMINI_BASE_URL
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -788,28 +867,29 @@ export default function ProviderList({
           <h3 className="text-lg font-semibold mb-4">导入/导出格式</h3>
           <div className="space-y-3 text-sm text-gray-400">
             <div className="flex items-start gap-3">
-              <FileJson className="w-5 h-5 text-[#4da6ff] mt-0.5" />
+              <FileJson className="w-5 h-5 mt-0.5" style={{ color: getTabColor() }} />
               <div>
                 <p className="text-gray-300 font-medium">JSON 格式</p>
                 <p className="text-gray-500">标准配置格式，包含完整的供应商信息</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <Database className="w-5 h-5 text-[#e94560] mt-0.5" />
+              <Database className="w-5 h-5 mt-0.5" style={{ color: getTabColor() }} />
               <div>
                 <p className="text-gray-300 font-medium">SQL 格式</p>
                 <p className="text-gray-500">
-                  兼容 <a href="https://github.com/farion1231/cc-switch" target="_blank" rel="noopener noreferrer" className="text-[#e94560] hover:underline">cc-switch</a> 项目的数据库格式
+                  兼容 <a href="https://github.com/farion1231/cc-switch" target="_blank" rel="noopener noreferrer" style={{ color: getTabColor() }} className="hover:underline">cc-switch</a> 项目的数据库格式
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <FileCode className="w-5 h-5 text-[#10b981] mt-0.5" />
+              <FileCode className="w-5 h-5 mt-0.5" style={{ color: getTabColor() }} />
               <div>
                 <p className="text-gray-300 font-medium">官方格式</p>
                 <p className="text-gray-500">
-                  Claude: <code className="text-xs bg-[#2d2d44] px-1 rounded">~/.claude/settings.json</code><br />
-                  Codex: <code className="text-xs bg-[#2d2d44] px-1 rounded">~/.codex/config.toml</code>
+                  <span className="text-[#e94560]">🔴 Claude:</span> <code className="text-xs bg-[#2d2d44] px-1 rounded">~/.claude/settings.json</code><br />
+                  <span className="text-[#10b981]">🟢 Codex:</span> <code className="text-xs bg-[#2d2d44] px-1 rounded">~/.codex/config.toml</code><br />
+                  <span className="text-[#4da6ff]">🔵 Gemini:</span> <code className="text-xs bg-[#2d2d44] px-1 rounded">~/.gemini/settings.json</code>
                 </p>
               </div>
             </div>

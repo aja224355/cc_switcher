@@ -354,6 +354,22 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
     }
   }
 
+  const getTabBgColor = () => {
+    switch (providerType) {
+      case 'claude': return 'rgba(233, 69, 96, 0.1)'
+      case 'codex': return 'rgba(16, 185, 129, 0.1)'
+      case 'gemini': return 'rgba(77, 166, 255, 0.1)'
+    }
+  }
+
+  const getTabIcon = () => {
+    switch (providerType) {
+      case 'claude': return '🔴'
+      case 'codex': return '🟢'
+      case 'gemini': return '🔵'
+    }
+  }
+
   const getTabLabel = () => {
     switch (providerType) {
       case 'claude': return 'Claude'
@@ -367,7 +383,7 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
   return (
     <div className="min-h-screen bg-[#1a1a2e]">
       {/* Header */}
-      <div className="border-b border-[#3d3d5c] px-6 py-4">
+      <div className="border-b border-[#3d3d5c] px-6 py-4" style={{ backgroundColor: getTabBgColor() }}>
         <div className="flex items-center gap-4">
           <button
             onClick={onCancel}
@@ -375,9 +391,21 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-xl font-semibold">
-            {provider ? '编辑' : '添加'} <span style={{ color: getTabColor() }}>{getTabLabel()}</span> 供应商
-          </h1>
+          <div className="flex items-center gap-3">
+            <span 
+              className="px-3 py-1 rounded-full text-sm font-medium"
+              style={{ 
+                backgroundColor: getTabBgColor(),
+                color: getTabColor(),
+                border: `1px solid ${getTabColor()}50`
+              }}
+            >
+              {getTabIcon()} {getTabLabel()}
+            </span>
+            <h1 className="text-xl font-semibold">
+              {provider ? '编辑' : '添加'}供应商
+            </h1>
+          </div>
         </div>
       </div>
 
@@ -1043,7 +1071,11 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
             <button onClick={onCancel} className="btn-secondary">
               取消
             </button>
-            <button onClick={handleSubmit} className="btn-primary">
+            <button 
+              onClick={handleSubmit} 
+              className="px-6 py-2 text-white rounded-lg font-medium transition-colors"
+              style={{ backgroundColor: getTabColor() }}
+            >
               {provider ? '保存修改' : '添加供应商'}
             </button>
           </div>

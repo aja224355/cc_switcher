@@ -49,11 +49,11 @@ import {
 type View = 'list' | 'form'
 type ExportFormat = 'json' | 'sql' | 'sql-all' | 'claude-settings' | 'codex-toml' | 'shell-env' | 'connection-cmd' | 'deploy-script' | 'wsl-apply'
 
-// 标签页配置
-const TABS: { type: ProviderType; label: string; color: string }[] = [
-  { type: 'claude', label: 'Claude', color: '#e94560' },
-  { type: 'codex', label: 'Codex', color: '#10b981' },
-  { type: 'gemini', label: 'Gemini', color: '#4da6ff' },
+// 标签页配置 - 每个 provider 有独特的品牌色
+const TABS: { type: ProviderType; label: string; color: string; bgColor: string; icon: string }[] = [
+  { type: 'claude', label: 'Claude', color: '#e94560', bgColor: 'rgba(233, 69, 96, 0.1)', icon: '🔴' },
+  { type: 'codex', label: 'Codex', color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)', icon: '🟢' },
+  { type: 'gemini', label: 'Gemini', color: '#4da6ff', bgColor: 'rgba(77, 166, 255, 0.1)', icon: '🔵' },
 ]
 
 function ConfigManager() {

@@ -13,6 +13,22 @@
   --accent-orange: #e94560;
   --accent-yellow: #f39c12;
   --border-color: #3d3d5c;
+  
+  /* Provider 品牌色 */
+  --claude-primary: #e94560;
+  --claude-secondary: #ff6b8a;
+  --claude-bg: rgba(233, 69, 96, 0.1);
+  --claude-border: rgba(233, 69, 96, 0.3);
+  
+  --codex-primary: #10b981;
+  --codex-secondary: #34d399;
+  --codex-bg: rgba(16, 185, 129, 0.1);
+  --codex-border: rgba(16, 185, 129, 0.3);
+  
+  --gemini-primary: #4da6ff;
+  --gemini-secondary: #7ec8ff;
+  --gemini-bg: rgba(77, 166, 255, 0.1);
+  --gemini-border: rgba(77, 166, 255, 0.3);
 }
 
 body {
@@ -71,4 +87,84 @@ body {
 /* Warning box */
 .warning-box {
   @apply bg-[#3d2a1a] border border-[#f39c12] rounded-lg p-4 text-[#f39c12] flex items-start gap-3;
+}
+
+/* Provider 品牌样式 */
+.provider-claude {
+  --provider-primary: var(--claude-primary);
+  --provider-secondary: var(--claude-secondary);
+  --provider-bg: var(--claude-bg);
+  --provider-border: var(--claude-border);
+}
+
+.provider-codex {
+  --provider-primary: var(--codex-primary);
+  --provider-secondary: var(--codex-secondary);
+  --provider-bg: var(--codex-bg);
+  --provider-border: var(--codex-border);
+}
+
+.provider-gemini {
+  --provider-primary: var(--gemini-primary);
+  --provider-secondary: var(--gemini-secondary);
+  --provider-bg: var(--gemini-bg);
+  --provider-border: var(--gemini-border);
+}
+
+/* Provider 卡片样式 */
+.provider-card {
+  @apply rounded-xl border p-4 transition-all duration-200;
+  background: var(--provider-bg);
+  border-color: var(--provider-border);
+}
+
+.provider-card:hover {
+  border-color: var(--provider-primary);
+  box-shadow: 0 0 20px var(--provider-bg);
+}
+
+.provider-card.active {
+  border-color: var(--provider-primary);
+  box-shadow: 0 0 15px var(--provider-bg);
+}
+
+/* Provider 标签样式 */
+.provider-badge {
+  @apply px-2 py-0.5 rounded-full text-xs font-medium;
+  background: var(--provider-bg);
+  color: var(--provider-primary);
+  border: 1px solid var(--provider-border);
+}
+
+/* Provider 按钮样式 */
+.provider-btn {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+  background: var(--provider-primary);
+  color: white;
+}
+
+.provider-btn:hover {
+  background: var(--provider-secondary);
+}
+
+/* Provider 图标样式 */
+.provider-icon {
+  color: var(--provider-primary);
+}
+
+/* Provider Tab 样式 */
+.provider-tab {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+  color: var(--text-secondary);
+}
+
+.provider-tab:hover {
+  background: var(--provider-bg);
+  color: var(--provider-primary);
+}
+
+.provider-tab.active {
+  background: var(--provider-bg);
+  color: var(--provider-primary);
+  border: 1px solid var(--provider-border);
 }
