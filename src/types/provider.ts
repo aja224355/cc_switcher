@@ -50,9 +50,26 @@ export interface WslPathConfig {
   wslUsername?: string              // WSL 用户名，用于计算 home 目录路径
   claudeConfigPath: string          // Linux 路径，默认 ~/.claude
   codexConfigPath: string           // Linux 路径，默认 ~/.codex
+  geminiConfigPath: string          // Linux 路径，默认 ~/.gemini
   bashrcPath: string                // Linux 路径，默认 ~/.bashrc
   // Windows UNC 路径前缀（自动计算或手动指定）
   windowsBasePath?: string          // 如 \\wsl$\Ubuntu 或 \\wsl.localhost\Ubuntu
+}
+
+// 全局设置
+export interface GlobalSettings {
+  // WSL 配置（全局）
+  wslConfig: WslPathConfig
+  // 本地配置路径（Windows/Linux/macOS）
+  localPaths: {
+    claudeConfigPath: string        // 默认 ~/.claude
+    codexConfigPath: string         // 默认 ~/.codex
+    geminiConfigPath: string        // 默认 ~/.gemini
+  }
+  // 远程环境列表（全局管理）
+  remoteEnvironments: RemoteEnvironment[]
+  // 本地代理设置
+  agentPort: number                 // 默认 17532
 }
 
 // 基础供应商接口

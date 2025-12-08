@@ -1,4 +1,4 @@
-import { Provider, ProviderType, ClaudeProvider, CodexProvider, GeminiProvider, EnvironmentMode, EnvironmentActiveProviders, RemoteEnvironment, WslPathConfig } from '@/types/provider'
+import { Provider, ProviderType, ClaudeProvider, CodexProvider, GeminiProvider, EnvironmentMode, EnvironmentActiveProviders, RemoteEnvironment, WslPathConfig, GlobalSettings } from '@/types/provider'
 import { v4 as uuidv4 } from 'uuid'
 
 // 存储键
@@ -25,6 +25,30 @@ const CURRENT_ENV_MODE_KEY = 'current-environment-mode'
 
 // 远程环境列表存储键
 const REMOTE_ENVIRONMENTS_KEY = 'remote-environments'
+
+// 全局设置存储键
+const GLOBAL_SETTINGS_KEY = 'cc-switcher-global-settings'
+
+// 默认全局设置
+export const defaultGlobalSettings: GlobalSettings = {
+  wslConfig: {
+    applyMode: 'windows',
+    distroName: 'Ubuntu',
+    wslUsername: '',
+    claudeConfigPath: '~/.claude',
+    codexConfigPath: '~/.codex',
+    geminiConfigPath: '~/.gemini',
+    bashrcPath: '~/.bashrc',
+    windowsBasePath: '',
+  },
+  localPaths: {
+    claudeConfigPath: '~/.claude',
+    codexConfigPath: '~/.codex',
+    geminiConfigPath: '~/.gemini',
+  },
+  remoteEnvironments: [],
+  agentPort: 17532,
+}
 
 // cc-switch SQL 格式的配置接口
 export interface CCSwitchConfig {
@@ -163,22 +187,73 @@ export function setActiveProviderId(id: string | null): void {
 }
 
 // ============================================
-// 远程环境管理
+// 全局设置管理
+// ============================================
+
+// 获取全局设置
+export function getGlobalSettings(): GlobalSettings {
+  try {
+    const data = localStorage.getItem(GLOBAL_SETTINGS_KEY)
+    if (data) {
+      const parsed = JSON.parse(data)
+      // 合并默认值，确保新增字段有值
+      return {
+        ...defaultGlobalSettings,
+        ...parsed,
+        wslConfig: { ...defaultGlobalSettings.wslConfig, ...parsed.wslConfig },
+        localPaths: { ...defaultGlobalSettings.localPaths, ...parsed.localPaths },
+      }
+    }
+    return { ...defaultGlobalSettings }
+  } catch {
+    return { ...defaultGlobalSettings }
+  }
+}
+
+// 保存全局设置
+export function saveGlobalSettings(settings: GlobalSettings): void {
+  localStorage.setItem(GLOBAL_SETTINGS_KEY, JSON.stringify(settings))
+}
+
+// 更新部分全局设置
+export function updateGlobalSettings(updates: Partial<GlobalSettings>): GlobalSettings {
+  const current = getGlobalSettings()
+  const updated = { ...current, ...updates }
+  saveGlobalSettings(updated)
+  return updated
+}
+
+// 获取 WSL 配置（从全局设置）
+export function getWslConfig(): WslPathConfig {
+  return getGlobalSettings().wslConfig
+}
+
+// 保存 WSL 配置（到全局设置）
+export function saveWslConfig(config: WslPathConfig): void {
+  const settings = getGlobalSettings()
+  settings.wslConfig = config
+  saveGlobalSettings(settings)
+}
+
+// ============================================
+// 远程环境管理（现在从全局设置中读取）
 // ============================================
 
 // 获取所有远程环境
 export function getRemoteEnvironments(): RemoteEnvironment[] {
-  try {
-    const data = localStorage.getItem(REMOTE_ENVIRONMENTS_KEY)
-    return data ? JSON.parse(data) : []
-  } catch {
-    return []
-  }
+  return getGlobalSettings().remoteEnvironments
+}
+
+// 保存所有远程环境（到全局设置）
+function saveRemoteEnvironmentsToSettings(envs: RemoteEnvironment[]): void {
+  const settings = getGlobalSettings()
+  settings.remoteEnvironments = envs
+  saveGlobalSettings(settings)
 }
 
 // 保存所有远程环境
 export function saveRemoteEnvironments(envs: RemoteEnvironment[]): void {
-  localStorage.setItem(REMOTE_ENVIRONMENTS_KEY, JSON.stringify(envs))
+  saveRemoteEnvironmentsToSettings(envs)
 }
 
 // 添加远程环境
@@ -344,12 +419,9 @@ export function applyProviderToCurrentEnv(
 
 // 生成 WSL 应用脚本
 export function generateWslApplyScript(provider: ClaudeProvider | CodexProvider | GeminiProvider): string {
-  // 获取自定义 WSL 路径或使用默认值
-  const wslPaths = provider.wslPaths || {
-    claudeConfigPath: '~/.claude',
-    codexConfigPath: '~/.codex',
-    bashrcPath: '~/.bashrc'
-  }
+  // 从全局设置获取 WSL 路径配置
+  const globalSettings = getGlobalSettings()
+  const wslPaths = globalSettings.wslConfig
   
   const lines: string[] = [
     '#!/bin/bash',
@@ -422,15 +494,9 @@ export function generateWslApplyScript(provider: ClaudeProvider | CodexProvider 
 
 // 生成 Windows PowerShell 脚本 - 从 Windows 直接写入 WSL 文件系统
 export function generateWslWindowsScript(provider: ClaudeProvider | CodexProvider | GeminiProvider): string {
-  const wslPaths = provider.wslPaths || {
-    applyMode: 'windows',
-    distroName: 'Ubuntu',
-    wslUsername: '',
-    claudeConfigPath: '~/.claude',
-    codexConfigPath: '~/.codex',
-    bashrcPath: '~/.bashrc',
-    windowsBasePath: '\\\\wsl.localhost\\Ubuntu'
-  }
+  // 从全局设置获取 WSL 路径配置
+  const globalSettings = getGlobalSettings()
+  const wslPaths = globalSettings.wslConfig
 
   const distroName = wslPaths.distroName || 'Ubuntu'
   const wslUsername = wslPaths.wslUsername || '$env:USERNAME'
@@ -610,7 +676,9 @@ export function generateWslWindowsScript(provider: ClaudeProvider | CodexProvide
 
 // 根据 applyMode 选择生成哪种脚本
 export function generateWslScript(provider: ClaudeProvider | CodexProvider | GeminiProvider): { script: string; type: 'bash' | 'powershell'; filename: string } {
-  const applyMode = provider.wslPaths?.applyMode || 'bash'
+  // 从全局设置获取 applyMode
+  const globalSettings = getGlobalSettings()
+  const applyMode = globalSettings.wslConfig.applyMode || 'bash'
   
   if (applyMode === 'windows') {
     return {

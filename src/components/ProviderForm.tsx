@@ -716,171 +716,24 @@ export default function ProviderForm({ provider, providerType, onSave, onCancel 
             </div>
           </div>
 
-          {/* WSL 路径配置 - 当选择 WSL 环境时显示 */}
+          {/* WSL 环境提示 - 引导到全局设置 */}
           {getCurrentFormData().environmentMode === 'wsl' && (
             <div className="border border-[#8b5cf6]/30 rounded-lg p-4 bg-[#8b5cf6]/5">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-3">
                 <Monitor className="w-4 h-4 text-[#8b5cf6]" />
                 <label className="text-sm font-medium text-[#8b5cf6]">
-                  WSL 配置
+                  WSL 环境
                 </label>
               </div>
-              
-              <div className="space-y-4">
-                {/* 应用方式选择 */}
-                <div>
-                  <label className="text-xs text-gray-500 mb-2 block">应用方式</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleWslPathChange('applyMode', 'windows')}
-                      className={`p-3 rounded-lg border text-left transition-all ${
-                        getCurrentFormData().wslPaths.applyMode === 'windows'
-                          ? 'border-[#8b5cf6] bg-[#8b5cf6]/20 text-white'
-                          : 'border-[#3d3d5c] bg-[#2d2d44] text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="font-medium text-sm">从 Windows 写入</div>
-                      <div className="text-xs opacity-70 mt-1">通过 \\wsl$\ 路径直接写入配置</div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleWslPathChange('applyMode', 'bash')}
-                      className={`p-3 rounded-lg border text-left transition-all ${
-                        getCurrentFormData().wslPaths.applyMode === 'bash'
-                          ? 'border-[#8b5cf6] bg-[#8b5cf6]/20 text-white'
-                          : 'border-[#3d3d5c] bg-[#2d2d44] text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="font-medium text-sm">在 WSL 内执行</div>
-                      <div className="text-xs opacity-70 mt-1">生成 Bash 脚本在 WSL 终端运行</div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Windows 模式配置 */}
-                {getCurrentFormData().wslPaths.applyMode === 'windows' && (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">WSL 发行版名称 *</label>
-                        <input
-                          type="text"
-                          className="input-field text-sm"
-                          placeholder="Ubuntu"
-                          value={getCurrentFormData().wslPaths.distroName || ''}
-                          onChange={(e) => {
-                            const distroName = e.target.value
-                            handleWslPathChange('distroName', distroName)
-                            // 自动更新 Windows 基路径
-                            if (distroName) {
-                              handleWslPathChange('windowsBasePath', `\\\\wsl.localhost\\${distroName}`)
-                            }
-                          }}
-                        />
-                        <p className="text-xs text-gray-600 mt-1">如: Ubuntu, Debian, Ubuntu-22.04</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">WSL 用户名 *</label>
-                        <input
-                          type="text"
-                          className="input-field text-sm"
-                          placeholder="your_username"
-                          value={(getCurrentFormData().wslPaths as any).wslUsername || ''}
-                          onChange={(e) => handleWslPathChange('wslUsername' as any, e.target.value)}
-                        />
-                        <p className="text-xs text-gray-600 mt-1">WSL 中的 Linux 用户名</p>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block">Windows 访问路径 (自动生成)</label>
-                      <input
-                        type="text"
-                        className="input-field text-sm bg-[#1a1a2e]"
-                        placeholder="\\wsl.localhost\Ubuntu"
-                        value={getCurrentFormData().wslPaths.windowsBasePath || ''}
-                        onChange={(e) => handleWslPathChange('windowsBasePath', e.target.value)}
-                      />
-                      <p className="text-xs text-gray-600 mt-1">
-                        也可使用 <code className="text-purple-400">\\wsl$\{getCurrentFormData().wslPaths.distroName || 'Ubuntu'}</code>
-                      </p>
-                    </div>
-                  </>
-                )}
-                
-                {/* 配置文件路径 */}
-                <div className="pt-2 border-t border-[#3d3d5c]">
-                  <label className="text-xs text-gray-400 mb-2 block">配置文件路径 (Linux 格式)</label>
-                  
-                  {providerType === 'claude' && (
-                    <div className="mb-3">
-                      <label className="text-xs text-gray-500 mb-1 block">Claude 配置目录</label>
-                      <input
-                        type="text"
-                        className="input-field text-sm"
-                        placeholder="~/.claude"
-                        value={getCurrentFormData().wslPaths.claudeConfigPath}
-                        onChange={(e) => handleWslPathChange('claudeConfigPath', e.target.value)}
-                      />
-                      <p className="text-xs text-gray-600 mt-1">settings.json 将保存到此目录</p>
-                    </div>
-                  )}
-                  
-                  {providerType === 'codex' && (
-                    <div className="mb-3">
-                      <label className="text-xs text-gray-500 mb-1 block">Codex 配置目录</label>
-                      <input
-                        type="text"
-                        className="input-field text-sm"
-                        placeholder="~/.codex"
-                        value={getCurrentFormData().wslPaths.codexConfigPath}
-                        onChange={(e) => handleWslPathChange('codexConfigPath', e.target.value)}
-                      />
-                      <p className="text-xs text-gray-600 mt-1">config.toml 将保存到此目录</p>
-                    </div>
-                  )}
-                  
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Shell 配置文件路径</label>
-                    <input
-                      type="text"
-                      className="input-field text-sm"
-                      placeholder="~/.bashrc"
-                      value={getCurrentFormData().wslPaths.bashrcPath}
-                      onChange={(e) => handleWslPathChange('bashrcPath', e.target.value)}
-                    />
-                    <p className="text-xs text-gray-600 mt-1">环境变量将追加到此文件 (zsh 用户可改为 ~/.zshrc)</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* 提示信息 */}
-              <div className="mt-4 p-3 bg-[#1a1a2e] rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs text-gray-400">
-                    {getCurrentFormData().wslPaths.applyMode === 'windows' ? (
-                      <>
-                        <p className="font-medium text-yellow-500 mb-1">Windows 模式说明</p>
-                        <ul className="space-y-1">
-                          <li>• 直接从 Windows 写入 WSL 文件系统，无需打开 WSL 终端</li>
-                          <li>• 通过 <code className="text-purple-400">\\wsl.localhost\</code> 或 <code className="text-purple-400">\\wsl$\</code> 路径访问</li>
-                          <li>• 需要正确的 WSL 用户名来定位 home 目录</li>
-                          <li>• 生成 PowerShell 脚本，双击或在 PowerShell 中运行</li>
-                        </ul>
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-medium text-yellow-500 mb-1">Bash 模式说明</p>
-                        <ul className="space-y-1">
-                          <li>• 使用 <code className="text-purple-400">~</code> 表示 WSL 用户主目录</li>
-                          <li>• 可使用绝对路径如 <code className="text-purple-400">/home/user/.config/claude</code></li>
-                          <li>• 生成 Bash 脚本，需在 WSL 终端中执行</li>
-                        </ul>
-                      </>
-                    )}
-                  </div>
+              <div className="flex items-start gap-3">
+                <Lightbulb className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-gray-300">
+                  <p className="mb-2">
+                    WSL 路径配置已移至<strong className="text-purple-400">全局设置</strong>，所有供应商共享相同的 WSL 配置。
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    点击页面顶部的 <span className="text-purple-400">⚙️ 设置</span> 按钮进行配置
+                  </p>
                 </div>
               </div>
             </div>

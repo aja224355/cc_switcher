@@ -41,11 +41,10 @@ interface ProviderListProps {
   onEnvModeChange?: (mode: EnvironmentMode) => void
   onEnvActivate?: (providerId: string, envMode: EnvironmentMode) => void
   onApplyConfig?: (providerId: string) => void
-  // 远程环境管理
+  // 远程环境（从全局设置读取）
   remoteEnvironments?: RemoteEnvironment[]
-  onAddRemoteEnv?: () => void
-  onEditRemoteEnv?: (env: RemoteEnvironment) => void
-  onDeleteRemoteEnv?: (id: string) => void
+  // 打开全局设置
+  onOpenGlobalSettings?: () => void
   // 本地代理状态
   agentStatus?: AgentStatus | null
   isApplying?: boolean
@@ -72,9 +71,7 @@ export default function ProviderList({
   onEnvActivate,
   onApplyConfig,
   remoteEnvironments = [],
-  onAddRemoteEnv,
-  onEditRemoteEnv,
-  onDeleteRemoteEnv,
+  onOpenGlobalSettings,
   agentStatus,
   isApplying = false,
 }: ProviderListProps) {
@@ -191,6 +188,17 @@ export default function ProviderList({
                 </>
               )}
             </div>
+            {/* 全局设置按钮 */}
+            {onOpenGlobalSettings && (
+              <button
+                onClick={onOpenGlobalSettings}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors"
+                title="全局设置 - 配置 WSL 路径和远程环境"
+              >
+                <Settings className="w-4 h-4" />
+                设置
+              </button>
+            )}
             <button
               onClick={onImport}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-[#2d2d44] hover:bg-[#3d3d5c] rounded-lg transition-colors"
@@ -421,19 +429,22 @@ export default function ProviderList({
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-300">远程环境</span>
-                  {onAddRemoteEnv && (
+                  {onOpenGlobalSettings && (
                     <button
-                      onClick={onAddRemoteEnv}
-                      className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                      onClick={onOpenGlobalSettings}
+                      className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-colors"
                     >
-                      <PlusCircle className="w-3 h-3" />
-                      添加远程
+                      <Settings className="w-3 h-3" />
+                      管理
                     </button>
                   )}
                 </div>
                 {remoteEnvironments.length === 0 ? (
-                  <div className="text-xs text-gray-500 p-3 border border-dashed border-[#3d3d5c] rounded-lg text-center">
-                    暂无远程环境，点击"添加远程"创建
+                  <div 
+                    className="text-xs text-gray-500 p-3 border border-dashed border-[#3d3d5c] rounded-lg text-center cursor-pointer hover:border-purple-500/50 hover:text-purple-400 transition-colors"
+                    onClick={onOpenGlobalSettings}
+                  >
+                    暂无远程环境，点击管理进行配置
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
@@ -453,20 +464,6 @@ export default function ProviderList({
                           <Server className="w-4 h-4" />
                           <span className="font-medium text-sm">{remote.name}</span>
                           <span className="text-xs opacity-60">({remote.host})</span>
-                          {onDeleteRemoteEnv && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (confirm(`确定删除远程环境 "${remote.name}" 吗？`)) {
-                                  onDeleteRemoteEnv(remote.id)
-                                }
-                              }}
-                              className="ml-1 p-0.5 rounded hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="删除"
-                            >
-                              <X className="w-3 h-3 text-red-400" />
-                            </button>
-                          )}
                         </button>
                       )
                     })}

@@ -4,11 +4,39 @@
 
 一个用于管理和切换 Claude Code 账户的工具，支持快速在不同 API 端点和认证令牌间切换。包含 CLI（shell 脚本）和 Web UI（React）两个版本。
 
-## 🚀 快速开始
+## 🚀 一键启动
 
-### Web UI 版本
+### Windows
 
-#### 安装
+```powershell
+# 双击 start.bat 或在 PowerShell 中运行:
+.\start.ps1
+
+# 或使用批处理文件:
+start.bat
+```
+
+### Linux / macOS / WSL
+
+```bash
+# 添加执行权限并运行
+chmod +x start.sh
+./start.sh
+```
+
+一键启动会自动完成：
+1. ✅ 检查 Node.js 环境
+2. ✅ 安装所有依赖（Web UI + 本地代理）
+3. ✅ 启动本地代理（用于直接写入配置文件）
+4. ✅ 启动 Web UI
+
+启动后访问：
+- 🌐 **Web UI**: http://localhost:5173
+- 🔌 **本地代理**: http://localhost:17532
+
+### 手动安装
+
+如果你更喜欢手动设置：
 
 ```bash
 # 安装依赖
@@ -19,9 +47,6 @@ npm run dev
 
 # 构建生产版本
 npm run build
-
-# 预览生产构建
-npm run preview
 ```
 
 #### 使用方法

@@ -4,11 +4,39 @@
 
 A management tool for switching Claude Code accounts, supporting quick switching between different API endpoints and authentication tokens. Includes both CLI (shell script) and Web UI (React) versions.
 
-## 🚀 Quick Start
+## 🚀 Quick Start (One-Click)
 
-### Web UI Version
+### Windows
 
-#### Installation
+```powershell
+# Double-click start.bat or run in PowerShell:
+.\start.ps1
+
+# Or use batch file:
+start.bat
+```
+
+### Linux / macOS / WSL
+
+```bash
+# Make script executable and run
+chmod +x start.sh
+./start.sh
+```
+
+This will automatically:
+1. ✅ Check and verify Node.js installation
+2. ✅ Install all dependencies (Web UI + Local Agent)
+3. ✅ Start the Local Agent (for direct file writing)
+4. ✅ Start the Web UI
+
+After startup:
+- 🌐 **Web UI**: http://localhost:5173
+- 🔌 **Local Agent**: http://localhost:17532
+
+### Manual Installation
+
+If you prefer to set things up manually:
 
 ```bash
 # Install dependencies
@@ -19,9 +47,6 @@ npm run dev
 
 # Build for production
 npm run build
-
-# Preview production build
-npm run preview
 ```
 
 #### Usage

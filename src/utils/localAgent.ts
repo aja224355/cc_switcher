@@ -4,7 +4,14 @@
  * 用于与本地代理程序通信，实现配置文件的读写操作
  */
 
-const AGENT_URL = 'http://localhost:17532'
+import { getGlobalSettings } from '@/utils/storage'
+
+// 动态获取代理 URL
+function getAgentUrl(): string {
+  const settings = getGlobalSettings()
+  return `http://localhost:${settings.agentPort || 17532}`
+}
+
 const TIMEOUT = 3000  // 3秒超时
 
 export interface AgentInfo {
@@ -64,7 +71,7 @@ export async function checkAgentStatus(): Promise<AgentInfo | null> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT)
     
-    const response = await fetch(`${AGENT_URL}/health`, {
+    const response = await fetch(`${getAgentUrl()}/health`, {
       signal: controller.signal
     })
     
@@ -82,7 +89,7 @@ export async function checkAgentStatus(): Promise<AgentInfo | null> {
 // 获取系统信息
 export async function getSystemInfo(): Promise<SystemInfo | null> {
   try {
-    const response = await fetch(`${AGENT_URL}/info`)
+    const response = await fetch(`${getAgentUrl()}/info`)
     if (response.ok) {
       return await response.json()
     }
@@ -98,7 +105,7 @@ export async function readConfig(
   target?: string
 ): Promise<ConfigResult> {
   try {
-    const url = new URL(`${AGENT_URL}/config/${type}`)
+    const url = new URL(`${getAgentUrl()}/config/${type}`)
     if (target) {
       url.searchParams.set('target', target)
     }
@@ -120,7 +127,7 @@ export async function writeConfig(
   options: { backup?: boolean; target?: string } = {}
 ): Promise<WriteResult> {
   try {
-    const response = await fetch(`${AGENT_URL}/config/${type}`, {
+    const response = await fetch(`${getAgentUrl()}/config/${type}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

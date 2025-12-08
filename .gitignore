@@ -5,3 +5,8 @@ dist
 .env.*.local
 **/tempobook/dynamic/
 **/tempobook/storyboards/
+
+# Local agent
+.agent.pid
+local-agent.log
+local-agent/node_modules
