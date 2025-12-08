@@ -6,33 +6,27 @@
 
 ## 🚀 一键启动
 
-### Windows
-
-```powershell
-# 双击 start.bat 或在 PowerShell 中运行:
-.\start.ps1
-
-# 或使用批处理文件:
-start.bat
-```
-
-### Linux / macOS / WSL
-
 ```bash
-# 添加执行权限并运行
-chmod +x start.sh
-./start.sh
+# 首次安装：安装所有依赖
+npm run setup
+
+# 启动本地代理 + Web UI
+npm start
 ```
 
-一键启动会自动完成：
-1. ✅ 检查 Node.js 环境
-2. ✅ 安装所有依赖（Web UI + 本地代理）
-3. ✅ 启动本地代理（用于直接写入配置文件）
-4. ✅ 启动 Web UI
-
-启动后访问：
+就这么简单！启动后访问：
 - 🌐 **Web UI**: http://localhost:5173
 - 🔌 **本地代理**: http://localhost:17532
+
+### 可用命令
+
+| 命令 | 说明 |
+|------|------|
+| `npm start` | 同时启动本地代理和 Web UI |
+| `npm run dev` | 仅启动 Web UI（不启动代理） |
+| `npm run agent` | 仅启动本地代理 |
+| `npm run setup` | 安装所有依赖（首次使用） |
+| `npm run build` | 构建生产版本 |
 
 ### 手动安装
 

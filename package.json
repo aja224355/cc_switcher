@@ -8,10 +8,11 @@
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "start": "node scripts/start.js",
+    "start": "concurrently -n agent,webui -c green,cyan \"npm run agent\" \"npm run dev\"",
     "agent": "cd local-agent && node index.js",
     "agent:install": "cd local-agent && npm install",
-    "setup": "npm install && npm run agent:install"
+    "setup": "npm install && npm run agent:install",
+    "dev:only": "vite"
   },
   "dependencies": {
     "lucide-react": "^0.556.0",
@@ -26,6 +27,7 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
+    "concurrently": "^9.2.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
