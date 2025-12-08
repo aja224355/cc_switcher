@@ -42,12 +42,30 @@ npm run preview
 4. **导入/导出**：
    - **导出**：点击"导出配置"将配置下载为 JSON 或 SQL 文件
    - **导入**：点击"导入配置"上传并恢复配置文件
-   - SQL 格式与 CLI 版本的数据库兼容
+   - SQL 格式与 CLI 版本的数据库和 [cc-switch](https://github.com/farion1231/cc-switch) 项目兼容
 
 5. **多环境支持**：
    - 本地、WSL 和远程 Linux 可以共用同一个 SQL 配置文件
    - 每个环境可以独立选择当前激活的供应商
    - 配置更改存储在浏览器的 localStorage 中
+
+### 🔌 本地代理（推荐 Windows 用户使用）
+
+Web UI 在浏览器中运行，无法直接写入配置文件。使用**本地代理**可以实现一键应用配置：
+
+```bash
+# 安装并启动本地代理
+cd local-agent
+npm install
+npm start
+```
+
+代理启动后（默认端口：17532），Web UI 会自动检测并启用以下功能：
+- **直接写入文件**：一键将配置应用到 `~/.claude/settings.json`、`~/.codex/config.toml` 等文件
+- **自动备份**：写入前自动备份现有配置
+- **多平台支持**：适用于 Windows、Linux、macOS 和 WSL
+
+代理状态指示器会显示在 Web UI 顶部，显示连接状态。
 
 ### CLI 版本（Shell 脚本）
 

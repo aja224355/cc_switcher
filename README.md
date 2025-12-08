@@ -42,12 +42,30 @@ npm run preview
 4. **Import/Export**:
    - **Export**: Click "导出配置" to download configuration as JSON or SQL file
    - **Import**: Click "导入配置" to upload and restore configuration from file
-   - SQL format is compatible with the CLI version's database
+   - SQL format is compatible with the CLI version's database and [cc-switch](https://github.com/farion1231/cc-switch) project
 
 5. **Multi-Environment Support**:
    - Local, WSL, and Remote Linux can share the same SQL configuration file
    - Each environment can independently select its active provider
    - Configuration changes are stored in browser localStorage
+
+### 🔌 Local Agent (Recommended for Windows)
+
+The Web UI runs in a browser and cannot directly write configuration files. Use the **Local Agent** to enable one-click configuration:
+
+```bash
+# Install and start the local agent
+cd local-agent
+npm install
+npm start
+```
+
+Once the agent is running (default port: 17532), the Web UI will detect it and enable:
+- **Direct File Writing**: One-click apply configuration to `~/.claude/settings.json`, `~/.codex/config.toml`, etc.
+- **Auto Backup**: Automatically backup existing configuration before writing
+- **Multi-Platform**: Works on Windows, Linux, macOS, and WSL
+
+The agent status indicator will appear in the Web UI header showing connection status.
 
 ### CLI Version (Shell Script)
 

@@ -13,6 +13,13 @@ interface TabConfig {
   icon?: string
 }
 
+interface AgentStatus {
+  status: string
+  version: string
+  environment: string
+  home: string
+}
+
 interface ProviderListProps {
   providers: Provider[]
   activeProviderId: string | null
@@ -39,6 +46,9 @@ interface ProviderListProps {
   onAddRemoteEnv?: () => void
   onEditRemoteEnv?: (env: RemoteEnvironment) => void
   onDeleteRemoteEnv?: (id: string) => void
+  // 本地代理状态
+  agentStatus?: AgentStatus | null
+  isApplying?: boolean
 }
 
 export default function ProviderList({
@@ -65,6 +75,8 @@ export default function ProviderList({
   onAddRemoteEnv,
   onEditRemoteEnv,
   onDeleteRemoteEnv,
+  agentStatus,
+  isApplying = false,
 }: ProviderListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -154,6 +166,31 @@ export default function ProviderList({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* 本地代理状态指示器 */}
+            <div 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${
+                agentStatus 
+                  ? 'bg-green-500/10 text-green-400 border border-green-500/30' 
+                  : 'bg-gray-500/10 text-gray-400 border border-gray-500/30'
+              }`}
+              title={agentStatus 
+                ? `本地代理运行中 (${agentStatus.environment})\n路径: ${agentStatus.home}` 
+                : '本地代理未运行 - 无法直接写入配置文件'
+              }
+            >
+              <span className={`w-2 h-2 rounded-full ${agentStatus ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+              {agentStatus ? (
+                <>
+                  <Zap className="w-3 h-3" />
+                  代理已连接
+                </>
+              ) : (
+                <>
+                  <Server className="w-3 h-3" />
+                  代理未连接
+                </>
+              )}
+            </div>
             <button
               onClick={onImport}
               className="flex items-center gap-2 px-4 py-2 text-sm bg-[#2d2d44] hover:bg-[#3d3d5c] rounded-lg transition-colors"
@@ -763,10 +800,25 @@ export default function ProviderList({
                   {envActiveProviders[currentEnvMode as keyof EnvironmentActiveProviders] === provider.id && onApplyConfig && (
                     <button
                       onClick={() => onApplyConfig(provider.id)}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded transition-colors"
+                      disabled={isApplying}
+                      className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-colors ${
+                        agentStatus 
+                          ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' 
+                          : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-400'
+                      } ${isApplying ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={agentStatus ? '配置将直接写入本地文件' : '配置将显示在对话框中供手动复制'}
                     >
-                      <Zap className="w-4 h-4" />
-                      一键应用配置
+                      {isApplying ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          应用中...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4" />
+                          {agentStatus ? '直接应用' : '应用配置'}
+                        </>
+                      )}
                     </button>
                   )}
                   {/* 旧的激活按钮保留向后兼容 */}
@@ -828,32 +880,82 @@ export default function ProviderList({
           <div className="space-y-3 text-sm text-gray-400">
             <p>1. 点击"添加供应商"创建新的 {tabs.find(t => t.type === providerType)?.label} 配置</p>
             <p>2. 填写 API Key 和请求地址等信息</p>
-            <p>3. 点击"使用此配置"激活配置</p>
-            <p>4. 复制生成的配置到对应的配置文件中</p>
+            <p>3. 点击 <span className="px-2 py-0.5 rounded text-xs" style={{ backgroundColor: `${getTabColor()}20`, color: getTabColor() }}>⚡ 一键应用配置</span> 按钮</p>
+            <p>4. 在弹出的对话框中复制配置内容</p>
+            <p>5. 将配置粘贴到对应的配置文件中</p>
+            
+            {/* Windows 11 提示 */}
+            <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <p className="text-yellow-400 font-medium mb-2">💡 Windows 11 用户快速指南</p>
+              <div className="space-y-2 text-xs text-gray-400">
+                <p>1. 按 <kbd className="px-1.5 py-0.5 bg-[#1a1a2e] rounded">Win + R</kbd> 打开运行对话框</p>
+                {providerType === 'claude' && (
+                  <p>2. 输入 <code className="bg-[#1a1a2e] px-1 rounded text-[#e94560]">%USERPROFILE%\.claude</code> 并回车</p>
+                )}
+                {providerType === 'codex' && (
+                  <p>2. 输入 <code className="bg-[#1a1a2e] px-1 rounded text-[#10b981]">%USERPROFILE%\.codex</code> 并回车</p>
+                )}
+                {providerType === 'gemini' && (
+                  <p>2. 输入 <code className="bg-[#1a1a2e] px-1 rounded text-[#4da6ff]">%USERPROFILE%\.gemini</code> 并回车</p>
+                )}
+                <p>3. 如果目录不存在，请手动创建</p>
+                {providerType === 'claude' && (
+                  <p>4. 用记事本打开或创建 <code className="bg-[#1a1a2e] px-1 rounded">settings.json</code>，粘贴配置</p>
+                )}
+                {providerType === 'codex' && (
+                  <p>4. 用记事本打开或创建 <code className="bg-[#1a1a2e] px-1 rounded">config.toml</code>，粘贴配置</p>
+                )}
+                {providerType === 'gemini' && (
+                  <p>4. 用记事本打开或创建 <code className="bg-[#1a1a2e] px-1 rounded">settings.json</code>，粘贴配置</p>
+                )}
+              </div>
+            </div>
+
             <div className="mt-4 p-4 bg-[#0f0f1a] rounded-lg">
               <p className="text-gray-300 mb-2">配置文件位置：</p>
               {providerType === 'claude' && (
                 <>
-                  <code className="text-[#e94560]">~/.claude/settings.json</code>
-                  <p className="text-gray-500 mt-2 text-xs">
-                    Windows WSL: /home/用户名/.claude/settings.json<br />
-                    Linux: ~/.claude/settings.json
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🪟</span>
+                    <code className="text-[#e94560]">%USERPROFILE%\.claude\settings.json</code>
+                  </div>
+                  <p className="text-gray-500 text-xs">
+                    即: C:\Users\你的用户名\.claude\settings.json
+                  </p>
+                  <div className="flex items-center gap-2 mt-3 mb-2">
+                    <span className="text-lg">🐧</span>
+                    <code className="text-[#e94560]">~/.claude/settings.json</code>
+                  </div>
+                  <p className="text-gray-500 text-xs">
+                    WSL/Linux 路径
                   </p>
                 </>
               )}
               {providerType === 'codex' && (
                 <>
-                  <code className="text-[#10b981]">~/.codex/config.toml</code>
-                  <p className="text-gray-500 mt-2 text-xs">
-                    Windows WSL: /home/用户名/.codex/config.toml<br />
-                    Linux: ~/.codex/config.toml
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🪟</span>
+                    <code className="text-[#10b981]">%USERPROFILE%\.codex\config.toml</code>
+                  </div>
+                  <p className="text-gray-500 text-xs">
+                    即: C:\Users\你的用户名\.codex\config.toml
+                  </p>
+                  <div className="flex items-center gap-2 mt-3 mb-2">
+                    <span className="text-lg">🐧</span>
+                    <code className="text-[#10b981]">~/.codex/config.toml</code>
+                  </div>
+                  <p className="text-gray-500 text-xs">
+                    WSL/Linux 路径
                   </p>
                 </>
               )}
               {providerType === 'gemini' && (
                 <>
-                  <code className="text-[#4da6ff]">~/.gemini/settings.json</code>
-                  <p className="text-gray-500 mt-2 text-xs">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🪟</span>
+                    <code className="text-[#4da6ff]">%USERPROFILE%\.gemini\settings.json</code>
+                  </div>
+                  <p className="text-gray-500 text-xs">
                     环境变量: GEMINI_API_KEY, GOOGLE_GEMINI_BASE_URL
                   </p>
                 </>
