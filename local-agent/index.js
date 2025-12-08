@@ -490,32 +490,64 @@ app.post('/open-folder', (req, res) => {
     
     // 根据操作系统打开文件夹
     const platform = os.platform()
-    let command
     
     if (platform === 'win32') {
-      command = `explorer "${expandedPath.replace(/\//g, '\\\\')}"`
+      // Windows: 使用 spawn 而不是 execSync，因为 explorer 总是返回非零退出码
+      const { spawn } = require('child_process')
+      const normalizedPath = expandedPath.replace(/\//g, '\\')
+      spawn('explorer', [normalizedPath], { 
+        detached: true, 
+        stdio: 'ignore' 
+      }).unref()
+      
+      console.log(`📂 打开文件夹: ${expandedPath}`)
+      res.json({
+        success: true,
+        path: expandedPath,
+        message: `已打开文件夹: ${expandedPath}`
+      })
     } else if (platform === 'darwin') {
-      command = `open "${expandedPath}"`
+      // macOS
+      execSync(`open "${expandedPath}"`, { stdio: 'ignore' })
+      console.log(`📂 打开文件夹: ${expandedPath}`)
+      res.json({
+        success: true,
+        path: expandedPath,
+        message: `已打开文件夹: ${expandedPath}`
+      })
     } else {
       // Linux (包括 WSL)
-      command = `xdg-open "${expandedPath}" 2>/dev/null || nautilus "${expandedPath}" 2>/dev/null || thunar "${expandedPath}" 2>/dev/null || echo "No file manager found"`
+      const { spawn } = require('child_process')
+      // 尝试多种文件管理器
+      const fileManagers = ['xdg-open', 'nautilus', 'dolphin', 'thunar', 'pcmanfm']
+      let opened = false
+      
+      for (const fm of fileManagers) {
+        try {
+          spawn(fm, [expandedPath], { 
+            detached: true, 
+            stdio: 'ignore' 
+          }).unref()
+          opened = true
+          break
+        } catch {
+          // 尝试下一个
+        }
+      }
+      
+      console.log(`📂 打开文件夹: ${expandedPath}`)
+      res.json({
+        success: true,
+        path: expandedPath,
+        message: `已打开文件夹: ${expandedPath}`
+      })
     }
-    
-    execSync(command, { stdio: 'ignore' })
-    console.log(`📂 打开文件夹: ${expandedPath}`)
-    
-    res.json({
-      success: true,
-      path: expandedPath,
-      message: `已打开文件夹: ${expandedPath}`
-    })
   } catch (error) {
     console.error(`❌ 打开文件夹失败:`, error)
     res.status(500).json({
       success: false,
       error: error.message
     })
-  }
 })
 
 // 浏览目录（列出子文件夹）
