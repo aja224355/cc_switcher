@@ -12,6 +12,7 @@ import {
   Check,
   FolderOpen,
   HardDrive,
+  ExternalLink,
 } from 'lucide-react'
 import {
   GlobalSettings as GlobalSettingsType,
@@ -24,6 +25,11 @@ import {
   saveGlobalSettings,
   defaultGlobalSettings,
 } from '@/utils/storage'
+import {
+  checkAgentStatus,
+  openFolder,
+  AgentInfo,
+} from '@/utils/localAgent'
 import { v4 as uuidv4 } from 'uuid'
 
 interface GlobalSettingsProps {
@@ -46,13 +52,31 @@ export default function GlobalSettings({ isOpen, onClose, onSettingsChange }: Gl
   })
   const [showAddRemote, setShowAddRemote] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [agentConnected, setAgentConnected] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setSettings(getGlobalSettings())
       setHasChanges(false)
+      // 检查代理状态
+      checkAgentStatus().then(status => {
+        setAgentConnected(!!status)
+      })
     }
   }, [isOpen])
+
+  // 打开文件夹
+  const handleOpenFolder = async (folderPath: string) => {
+    if (!agentConnected) {
+      alert('本地代理未连接，无法打开文件夹。\n\n请先运行 npm start 启动本地代理。')
+      return
+    }
+    
+    const result = await openFolder(folderPath)
+    if (!result.success) {
+      alert(`打开文件夹失败: ${result.error}`)
+    }
+  }
 
   const handleSave = () => {
     saveGlobalSettings(settings)
@@ -202,11 +226,19 @@ export default function GlobalSettings({ isOpen, onClose, onSettingsChange }: Gl
             <div className="space-y-6">
               <div className="flex items-start gap-3 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
                 <HardDrive className="w-5 h-5 text-green-400 mt-0.5" />
-                <div className="text-sm">
+                <div className="text-sm flex-1">
                   <p className="text-green-400 font-medium mb-1">本地环境配置</p>
                   <p className="text-gray-300">
-                    配置 Claude、Codex、Gemini 在本地系统的配置文件路径
+                    配置 Claude、Codex、Gemini 在本地系统的配置文件路径。可手动输入路径，或点击"打开"按钮在文件资源管理器中查看。
                   </p>
+                </div>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs ${
+                  agentConnected 
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                    : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${agentConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+                  {agentConnected ? '代理已连接' : '代理未连接'}
                 </div>
               </div>
 
@@ -215,13 +247,27 @@ export default function GlobalSettings({ isOpen, onClose, onSettingsChange }: Gl
                   <h3 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
                     <span className="text-red-400">🔴</span> Claude 配置路径
                   </h3>
-                  <input
-                    type="text"
-                    value={settings.localPaths.claudeConfigPath}
-                    onChange={e => updateLocalPaths('claudeConfigPath', e.target.value)}
-                    placeholder="~/.claude"
-                    className="input w-full"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={settings.localPaths.claudeConfigPath}
+                      onChange={e => updateLocalPaths('claudeConfigPath', e.target.value)}
+                      placeholder="~/.claude"
+                      className="input flex-1"
+                    />
+                    <button
+                      onClick={() => handleOpenFolder(settings.localPaths.claudeConfigPath)}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        agentConnected 
+                          ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' 
+                          : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                      }`}
+                      title={agentConnected ? '在文件资源管理器中打开' : '需要本地代理才能打开文件夹'}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      打开
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Windows: %USERPROFILE%\.claude | Linux/macOS: ~/.claude
                   </p>
@@ -231,13 +277,27 @@ export default function GlobalSettings({ isOpen, onClose, onSettingsChange }: Gl
                   <h3 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
                     <span className="text-green-400">🟢</span> Codex 配置路径
                   </h3>
-                  <input
-                    type="text"
-                    value={settings.localPaths.codexConfigPath}
-                    onChange={e => updateLocalPaths('codexConfigPath', e.target.value)}
-                    placeholder="~/.codex"
-                    className="input w-full"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={settings.localPaths.codexConfigPath}
+                      onChange={e => updateLocalPaths('codexConfigPath', e.target.value)}
+                      placeholder="~/.codex"
+                      className="input flex-1"
+                    />
+                    <button
+                      onClick={() => handleOpenFolder(settings.localPaths.codexConfigPath)}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        agentConnected 
+                          ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' 
+                          : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                      }`}
+                      title={agentConnected ? '在文件资源管理器中打开' : '需要本地代理才能打开文件夹'}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      打开
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Windows: %USERPROFILE%\.codex | Linux/macOS: ~/.codex
                   </p>
@@ -247,13 +307,27 @@ export default function GlobalSettings({ isOpen, onClose, onSettingsChange }: Gl
                   <h3 className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
                     <span className="text-blue-400">🔵</span> Gemini 配置路径
                   </h3>
-                  <input
-                    type="text"
-                    value={settings.localPaths.geminiConfigPath}
-                    onChange={e => updateLocalPaths('geminiConfigPath', e.target.value)}
-                    placeholder="~/.gemini"
-                    className="input w-full"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={settings.localPaths.geminiConfigPath}
+                      onChange={e => updateLocalPaths('geminiConfigPath', e.target.value)}
+                      placeholder="~/.gemini"
+                      className="input flex-1"
+                    />
+                    <button
+                      onClick={() => handleOpenFolder(settings.localPaths.geminiConfigPath)}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors ${
+                        agentConnected 
+                          ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' 
+                          : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                      }`}
+                      title={agentConnected ? '在文件资源管理器中打开' : '需要本地代理才能打开文件夹'}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      打开
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-2">
                     Windows: %USERPROFILE%\.gemini | Linux/macOS: ~/.gemini
                   </p>
@@ -264,13 +338,19 @@ export default function GlobalSettings({ isOpen, onClose, onSettingsChange }: Gl
                     <FolderOpen className="w-4 h-4 text-purple-400" />
                     本地代理端口
                   </h3>
-                  <input
-                    type="number"
-                    value={settings.agentPort}
-                    onChange={e => updateSettings('agentPort', parseInt(e.target.value) || 17532)}
-                    placeholder="17532"
-                    className="input w-32"
-                  />
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="number"
+                      value={settings.agentPort}
+                      onChange={e => updateSettings('agentPort', parseInt(e.target.value) || 17532)}
+                      placeholder="17532"
+                      className="input w-32"
+                    />
+                    <div className={`flex items-center gap-2 text-xs ${agentConnected ? 'text-green-400' : 'text-gray-500'}`}>
+                      <span className={`w-2 h-2 rounded-full ${agentConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+                      {agentConnected ? '代理已连接' : '代理未连接'}
+                    </div>
+                  </div>
                   <p className="text-xs text-gray-500 mt-2">
                     本地代理程序运行端口，默认 17532
                   </p>
@@ -359,37 +439,76 @@ export default function GlobalSettings({ isOpen, onClose, onSettingsChange }: Gl
                       <label className="text-xs text-gray-400 flex items-center gap-2 mb-1">
                         <span className="text-red-400">🔴</span> Claude 配置目录
                       </label>
-                      <input
-                        type="text"
-                        value={settings.wslConfig.claudeConfigPath}
-                        onChange={e => updateWslConfig('claudeConfigPath', e.target.value)}
-                        placeholder="~/.claude"
-                        className="input w-full"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={settings.wslConfig.claudeConfigPath}
+                          onChange={e => updateWslConfig('claudeConfigPath', e.target.value)}
+                          placeholder="~/.claude"
+                          className="input flex-1"
+                        />
+                        <button
+                          onClick={() => handleOpenFolder(settings.wslConfig.claudeConfigPath)}
+                          className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                            agentConnected 
+                              ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400' 
+                              : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                          }`}
+                          title={agentConnected ? '打开文件夹' : '需要本地代理'}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 flex items-center gap-2 mb-1">
                         <span className="text-green-400">🟢</span> Codex 配置目录
                       </label>
-                      <input
-                        type="text"
-                        value={settings.wslConfig.codexConfigPath}
-                        onChange={e => updateWslConfig('codexConfigPath', e.target.value)}
-                        placeholder="~/.codex"
-                        className="input w-full"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={settings.wslConfig.codexConfigPath}
+                          onChange={e => updateWslConfig('codexConfigPath', e.target.value)}
+                          placeholder="~/.codex"
+                          className="input flex-1"
+                        />
+                        <button
+                          onClick={() => handleOpenFolder(settings.wslConfig.codexConfigPath)}
+                          className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                            agentConnected 
+                              ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400' 
+                              : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                          }`}
+                          title={agentConnected ? '打开文件夹' : '需要本地代理'}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 flex items-center gap-2 mb-1">
                         <span className="text-blue-400">🔵</span> Gemini 配置目录
                       </label>
-                      <input
-                        type="text"
-                        value={settings.wslConfig.geminiConfigPath}
-                        onChange={e => updateWslConfig('geminiConfigPath', e.target.value)}
-                        placeholder="~/.gemini"
-                        className="input w-full"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={settings.wslConfig.geminiConfigPath}
+                          onChange={e => updateWslConfig('geminiConfigPath', e.target.value)}
+                          placeholder="~/.gemini"
+                          className="input flex-1"
+                        />
+                        <button
+                          onClick={() => handleOpenFolder(settings.wslConfig.geminiConfigPath)}
+                          className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+                            agentConnected 
+                              ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400' 
+                              : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                          }`}
+                          title={agentConnected ? '打开文件夹' : '需要本地代理'}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 mb-1 block">bashrc 路径</label>

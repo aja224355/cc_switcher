@@ -155,7 +155,7 @@ export async function setEnvVars(
   format: 'shell' | 'powershell' | 'dotenv' = 'shell'
 ): Promise<WriteResult> {
   try {
-    const response = await fetch(`${AGENT_URL}/env/${type}`, {
+    const response = await fetch(`${getAgentUrl()}/env/${type}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -192,7 +192,7 @@ export async function applyConfigs(
   message: string
 }> {
   try {
-    const response = await fetch(`${AGENT_URL}/apply`, {
+    const response = await fetch(`${getAgentUrl()}/apply`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -219,7 +219,7 @@ export async function listBackups(
   error?: string
 }> {
   try {
-    const response = await fetch(`${AGENT_URL}/backups/${type}`)
+    const response = await fetch(`${getAgentUrl()}/backups/${type}`)
     return await response.json()
   } catch (error) {
     return {
@@ -236,7 +236,7 @@ export async function restoreBackup(
   backupFile: string
 ): Promise<WriteResult> {
   try {
-    const response = await fetch(`${AGENT_URL}/restore/${type}`, {
+    const response = await fetch(`${getAgentUrl()}/restore/${type}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -244,6 +244,64 @@ export async function restoreBackup(
       body: JSON.stringify({ backupFile })
     })
     
+    return await response.json()
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '连接本地代理失败'
+    }
+  }
+}
+
+// 打开文件夹（在本地文件资源管理器中）
+export async function openFolder(folderPath: string): Promise<{
+  success: boolean
+  path?: string
+  message?: string
+  error?: string
+}> {
+  try {
+    const response = await fetch(`${getAgentUrl()}/open-folder`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ path: folderPath })
+    })
+    
+    return await response.json()
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '连接本地代理失败'
+    }
+  }
+}
+
+// 浏览目录
+export interface BrowseItem {
+  name: string
+  path: string
+  isDirectory: boolean
+  size: number
+  modified: string
+}
+
+export async function browseDirectory(browsePath?: string): Promise<{
+  success: boolean
+  path?: string
+  exists?: boolean
+  parent?: string
+  items?: BrowseItem[]
+  error?: string
+}> {
+  try {
+    const url = new URL(`${getAgentUrl()}/browse`)
+    if (browsePath) {
+      url.searchParams.set('path', browsePath)
+    }
+    
+    const response = await fetch(url.toString())
     return await response.json()
   } catch (error) {
     return {

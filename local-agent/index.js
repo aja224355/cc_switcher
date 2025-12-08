@@ -464,6 +464,123 @@ app.post('/restore/:type', (req, res) => {
   }
 })
 
+// 打开文件夹（在文件资源管理器中）
+app.post('/open-folder', (req, res) => {
+  const { path: folderPath } = req.body
+  
+  if (!folderPath) {
+    return res.status(400).json({
+      success: false,
+      error: '缺少文件夹路径'
+    })
+  }
+  
+  try {
+    // 展开 ~ 为用户目录
+    let expandedPath = folderPath
+    if (expandedPath.startsWith('~')) {
+      expandedPath = path.join(HOME, expandedPath.slice(1))
+    }
+    
+    // 确保目录存在
+    if (!fs.existsSync(expandedPath)) {
+      fs.mkdirSync(expandedPath, { recursive: true })
+      console.log(`📁 创建目录: ${expandedPath}`)
+    }
+    
+    // 根据操作系统打开文件夹
+    const platform = os.platform()
+    let command
+    
+    if (platform === 'win32') {
+      command = `explorer "${expandedPath.replace(/\//g, '\\\\')}"`
+    } else if (platform === 'darwin') {
+      command = `open "${expandedPath}"`
+    } else {
+      // Linux (包括 WSL)
+      command = `xdg-open "${expandedPath}" 2>/dev/null || nautilus "${expandedPath}" 2>/dev/null || thunar "${expandedPath}" 2>/dev/null || echo "No file manager found"`
+    }
+    
+    execSync(command, { stdio: 'ignore' })
+    console.log(`📂 打开文件夹: ${expandedPath}`)
+    
+    res.json({
+      success: true,
+      path: expandedPath,
+      message: `已打开文件夹: ${expandedPath}`
+    })
+  } catch (error) {
+    console.error(`❌ 打开文件夹失败:`, error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// 浏览目录（列出子文件夹）
+app.get('/browse', (req, res) => {
+  const { path: browsePath } = req.query
+  
+  let targetPath = browsePath || HOME
+  
+  // 展开 ~ 为用户目录
+  if (targetPath.startsWith('~')) {
+    targetPath = path.join(HOME, targetPath.slice(1))
+  }
+  
+  try {
+    if (!fs.existsSync(targetPath)) {
+      return res.json({
+        success: true,
+        path: targetPath,
+        exists: false,
+        items: []
+      })
+    }
+    
+    const stats = fs.statSync(targetPath)
+    if (!stats.isDirectory()) {
+      return res.status(400).json({
+        success: false,
+        error: '路径不是目录'
+      })
+    }
+    
+    const items = fs.readdirSync(targetPath)
+      .map(name => {
+        const fullPath = path.join(targetPath, name)
+        try {
+          const itemStats = fs.statSync(fullPath)
+          return {
+            name,
+            path: fullPath,
+            isDirectory: itemStats.isDirectory(),
+            size: itemStats.size,
+            modified: itemStats.mtime
+          }
+        } catch {
+          return null
+        }
+      })
+      .filter(item => item !== null && item.isDirectory)
+      .sort((a, b) => a.name.localeCompare(b.name))
+    
+    res.json({
+      success: true,
+      path: targetPath,
+      exists: true,
+      parent: path.dirname(targetPath),
+      items
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
 // ============================================
 // 启动服务器
 // ============================================
@@ -505,6 +622,8 @@ app.listen(PORT, () => {
   console.log(`   POST /apply         - 批量应用配置`)
   console.log(`   GET  /backups/:type - 列出备份`)
   console.log(`   POST /restore/:type - 恢复备份`)
+  console.log(`   POST /open-folder   - 打开文件夹`)
+  console.log(`   GET  /browse        - 浏览目录`)
   console.log('')
   console.log('💡 在浏览器中打开 CC Switcher Web UI，即可使用一键应用功能')
   console.log('')
