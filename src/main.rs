@@ -1,7 +1,8 @@
-use eframe::egui;
 use cc_switcher_gui::config::manager::ConfigManager;
 use cc_switcher_gui::models::config::{Config, Profile};
 use cc_switcher_gui::utils::environment::EnvironmentManager;
+use cc_switcher_gui::utils::theme::{apply_theme, ThemePalette};
+use eframe::egui;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
@@ -17,6 +18,7 @@ struct AppState {
     config_manager: ConfigManager,
     config: Arc<Mutex<Config>>,
     current_view: Arc<Mutex<View>>,
+    palette: ThemePalette,
     // Form fields for adding/editing profiles
     new_profile_name: String,
     new_profile_url: String,
@@ -31,6 +33,20 @@ struct AppState {
 }
 
 impl AppState {
+    fn card_frame(&self) -> egui::Frame {
+        egui::Frame::none()
+            .fill(self.palette.surface)
+            .stroke(egui::Stroke::new(1.0, self.palette.border))
+            .rounding(egui::Rounding::same(10.0))
+            .inner_margin(egui::Margin::symmetric(14.0, 12.0))
+    }
+
+    fn primary_button(&self, label: &str) -> egui::Button<'_> {
+        egui::Button::new(egui::RichText::new(label).color(egui::Color32::WHITE))
+            .fill(self.palette.primary)
+            .stroke(egui::Stroke::NONE)
+    }
+
     fn new() -> Self {
         let config_manager = ConfigManager::new().expect("Failed to initialize config manager");
         let config = config_manager.load_config().unwrap_or_else(|_| Config::new());
@@ -39,6 +55,7 @@ impl AppState {
             config_manager,
             config: Arc::new(Mutex::new(config)),
             current_view: Arc::new(Mutex::new(View::ProfileList)),
+            palette: ThemePalette::default(),
             new_profile_name: String::new(),
             new_profile_url: "https://api.anthropic.com".to_string(),
             new_profile_token: String::new(),
@@ -117,31 +134,42 @@ impl AppState {
         };
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("Profiles");
-                ui.add_space(ui.available_width() - 100.0);
-                if ui.button("+ Add Profile").clicked() {
-                    if let Ok(mut view) = self.current_view.lock() {
-                        *view = View::AddProfile;
-                    }
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.heading("Profiles");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.add(self.primary_button("+ Add Profile")).clicked() {
+                            if let Ok(mut view) = self.current_view.lock() {
+                                *view = View::AddProfile;
+                            }
+                        }
+                    });
+                });
+
+                ui.add_space(8.0);
+
+                if profiles.is_empty() {
+                    self.card_frame().show(ui, |ui| {
+                        ui.vertical_centered(|ui| {
+                            ui.label(egui::RichText::new("No profiles yet").strong());
+                            ui.label(egui::RichText::new("Add a profile to start switching endpoints").color(self.palette.muted));
+                        });
+                    });
+                } else {
+                    egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+                        ui.spacing_mut().item_spacing = egui::vec2(10.0, 10.0);
+                        for (name, profile) in profiles.iter() {
+                            let is_current = current.as_ref() == Some(name);
+                            self.show_profile_item(ui, name, profile, is_current);
+                        }
+                    });
                 }
             });
-
-            if profiles.is_empty() {
-                ui.label("No profiles configured. Click 'Add Profile' to get started.");
-            } else {
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for (name, profile) in profiles.iter() {
-                        let is_current = current.as_ref() == Some(name);
-                        self.show_profile_item(ui, name, profile, is_current);
-                    }
-                });
-            }
         });
     }
 
     fn show_profile_item(&mut self, ui: &mut egui::Ui, name: &str, profile: &Profile, is_current: bool) {
-        egui::Frame::group(ui.style()).show(ui, |ui| {
+        self.card_frame().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.label(egui::RichText::new(name).heading());
@@ -149,45 +177,40 @@ impl AppState {
                     ui.label(
                         egui::RichText::new(if is_current { "Currently Active" } else { "Inactive" })
                             .small()
-                            .color(if is_current { egui::Color32::GREEN } else { egui::Color32::GRAY })
+                            .color(if is_current { self.palette.success } else { self.palette.muted })
                     );
                     if let Some(desc) = &profile.description {
-                        ui.label(egui::RichText::new(desc).small().italics());
+                        ui.label(egui::RichText::new(desc).small());
                     }
                 });
-                
-                ui.add_space(ui.available_width() - 200.0);
-                
-                ui.vertical(|ui| {
-                    if !is_current {
-                        if ui.button("Activate").clicked() {
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Delete").clicked() {
                             if let Ok(mut config_guard) = self.config.lock() {
-                                config_guard.set_current(name);
-                                
-                                // Apply to environment
-                                if let Some(profile) = config_guard.get_profile(name) {
-                                    let _ = EnvironmentManager::apply_profile(profile);
-                                }
-                                
+                                config_guard.delete_profile(name);
                                 let _ = self.save_config();
                             }
                         }
-                    } else {
-                        ui.add_enabled(false, egui::Button::new("Active"));
-                    }
-                    
-                    if ui.button("Edit").clicked() {
-                        if let Ok(mut view) = self.current_view.lock() {
-                            *view = View::EditProfile(name.to_string());
+                        if ui.button("Edit").clicked() {
+                            if let Ok(mut view) = self.current_view.lock() {
+                                *view = View::EditProfile(name.to_string());
+                            }
                         }
-                    }
-                    
-                    if ui.button("Delete").clicked() {
-                        if let Ok(mut config_guard) = self.config.lock() {
-                            config_guard.delete_profile(name);
-                            let _ = self.save_config();
+                        if !is_current {
+                            if ui.add(self.primary_button("Activate")).clicked() {
+                                if let Ok(mut config_guard) = self.config.lock() {
+                                    config_guard.set_current(name);
+                                    if let Some(profile) = config_guard.get_profile(name) {
+                                        let _ = EnvironmentManager::apply_profile(profile);
+                                    }
+                                    let _ = self.save_config();
+                                }
+                            }
+                        } else {
+                            ui.add_enabled(false, egui::Button::new("Active"));
                         }
-                    }
+                    });
                 });
             });
         });
@@ -217,7 +240,7 @@ impl AppState {
             ui.add_space(20.0);
 
             ui.horizontal(|ui| {
-                if ui.button("Save").clicked() {
+                if ui.add(self.primary_button("Save")).clicked() {
                     if !self.new_profile_name.is_empty() && !self.new_profile_token.is_empty() {
                         let profile = Profile::new(
                             self.new_profile_url.clone(),
@@ -279,7 +302,7 @@ impl AppState {
                     ui.add_space(20.0);
 
                     ui.horizontal(|ui| {
-                        if ui.button("Save").clicked() {
+                        if ui.add(self.primary_button("Save")).clicked() {
                             let mut updated_profile = Profile::new(edit_url, edit_token);
                             updated_profile.description = Some(edit_description);
                             
@@ -342,12 +365,12 @@ impl AppState {
             ui.add_space(20.0);
 
             ui.horizontal(|ui| {
-                if ui.button("Test Connection").clicked() {
+                if ui.add(self.primary_button("Test Connection")).clicked() {
                     // TODO: Implement connection test
                     ui.label("Connection test would be implemented here");
                 }
                 
-                if ui.button("Push Current Config").clicked() {
+                if ui.add(self.primary_button("Push Current Config")).clicked() {
                     // TODO: Implement config push
                     ui.label("Config push would be implemented here");
                 }
@@ -420,6 +443,9 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "Claude Code Switcher",
         options,
-        Box::new(|_cc| Box::new(AppState::new())),
+        Box::new(|cc| {
+            apply_theme(&cc.egui_ctx);
+            Box::new(AppState::new())
+        }),
     )
 }
