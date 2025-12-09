@@ -1,0 +1,23 @@
+[package]
+name = "cc_switcher_gui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.27"
+egui = "0.27"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.11", features = ["json"] }
+ssh2 = "0.9"
+
+[target.'cfg(windows)'.dependencies]
+rpassword = "7.0"
+winreg = "0.10"
+
+[target.'cfg(not(windows))'.dependencies]
+rpassword = "7.0"
